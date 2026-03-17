@@ -15,7 +15,7 @@
   };
 
   # Disable PulseAudio (Pipewire replaces it)
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
 
   # Enable realtime audio processing
   security.rtkit.enable = true;

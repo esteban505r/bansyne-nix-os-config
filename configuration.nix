@@ -5,6 +5,10 @@
 
 {
   # Import hardware configuration
+  # NOTE: hardware-configuration.nix is a generated file. You have two options:
+  # 1. Include it in the flake (current approach) - makes flake self-contained
+  # 2. Reference from /etc/nixos - keeps it separate but less portable
+  # If you want to regenerate it: sudo nixos-generate-config --show-hardware-config > hardware-configuration.nix
   imports = [
     ./hardware-configuration.nix
     ./modules/locale.nix
@@ -15,6 +19,14 @@
     ./modules/sway.nix
   ];
 
+
+  # Bootloader configuration
+  # NOTE: You should generate hardware-configuration.nix with:
+  # sudo nixos-generate-config --show-hardware-config > hardware-configuration.nix
+  # This will include your actual filesystem and bootloader settings
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
   # Enable flakes and nix-command
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
@@ -24,29 +36,23 @@
   nixpkgs.config.allowUnfree = true;
 
   # System state version - should match your NixOS release
-  system.stateVersion = "24.11";
+  system.stateVersion = "25.11";
 
-  # Specializations - create different boot entries with different configurations
-  # Access specializations at boot by selecting them from the boot menu
-  specialisations = {
-    # Gaming specialization - includes RetroArch, Dolphin, and Steam
-    gaming = {
-      # Inherit the base configuration and add gaming module
-      configuration = {
-        imports = [
-          ./modules/gaming.nix
-        ];
-      };
+  # Specialisations - create different boot entries with different configurations
+  # Access specialisations at boot by selecting them from the boot menu
+  specialisation = {
+    # Gaming specialisation - includes RetroArch, Dolphin, and Steam
+    gaming.configuration = {
+      imports = [
+        ./modules/gaming.nix
+      ];
     };
     
-    # Development specialization - includes Android Studio, Cursor, nvm, fvm, JDK, IntelliJ, Git, etc.
-    developing = {
-      # Inherit the base configuration and add development module
-      configuration = {
-        imports = [
-          ./modules/developing.nix
-        ];
-      };
+    # Development specialisation - includes Android Studio, Cursor, nvm, fvm, JDK, IntelliJ, Git, etc.
+    developing.configuration = {
+      imports = [
+        ./modules/developing.nix
+      ];
     };
   };
 }

@@ -9,7 +9,7 @@
     sway
     swaylock
     swayidle
-    waybar
+    # waybar: provided by sway.nix with bottom-position config
     bemenu
     foot
     grim

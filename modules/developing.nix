@@ -15,8 +15,8 @@
     
     # IDEs and Editors
     android-studio  # Android Studio IDE
-    jetbrains.idea-ultimate  # IntelliJ IDEA Ultimate
-    code-cursor  # Cursor editor (VS Code fork)
+    jetbrains.idea  # IntelliJ IDEA (formerly idea-ultimate)
+    code-cursor  # Cursor IDE (latest from nixos-unstable; unfree)
     
     # Node.js and version managers
     nodejs_20  # Node.js LTS
@@ -55,10 +55,8 @@
     package = pkgs.jdk21;
   };
 
-  # Enable Android Studio
-  programs.android-studio = {
-    enable = true;
-  };
+  # Note: Android Studio is installed as a package above
+  # There is no programs.android-studio option in NixOS
 
   # Enable Docker
   virtualisation.docker = {

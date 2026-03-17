@@ -1,0 +1,12 @@
+# NixOS flake configuration .gitignore
+
+# Optionally ignore hardware-configuration.nix if you don't want to commit it
+# (Many people DO commit it since it's part of the system config)
+# hardware-configuration.nix
+
+# Nix build artifacts
+result
+result-*
+
+# Flake lock file (optional - some people commit it, some don't)
+# flake.lock

@@ -7,9 +7,14 @@
   };
 
   outputs = { self, nixpkgs, ... }@inputs: {
+    # Main NixOS configuration
+    # Specializations (gaming, developing) are defined in configuration.nix
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        # Allow unfree packages (required for Cursor, Steam, Android Studio, etc.)
+        # Must be set at flake level so nixpkgs is instantiated with it
+        { nixpkgs.config.allowUnfree = true; }
         ./configuration.nix
       ];
     };
