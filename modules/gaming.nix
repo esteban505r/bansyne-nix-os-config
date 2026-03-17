@@ -6,15 +6,17 @@
 {
   # Gaming packages
   environment.systemPackages = with pkgs; [
-    # RetroArch - Multi-system emulator frontend
-    retroarch
-    
-    # Dolphin - GameCube and Wii emulator
-    dolphin-emu
-    
-    # Steam - Gaming platform and store
-    steam
-    steam-run
+    # --- Emulators ---
+    retroarch     # Multi-system emulator frontend (libretro cores)
+    dolphin-emu   # GameCube and Wii emulator
+
+    # --- Controllers ---
+    joycond       # Nintendo Joy-Con driver/daemon (pairing, motion)
+    evdevhook2    # Cemuhook UDP server for gamepad/motion (Cemu, etc.)
+
+    # --- Steam ---
+    steam         # Steam client and store
+    steam-run     # Run arbitrary programs in Steam’s runtime (libs, Proton)
   ];
 
   # Enable Steam with proper configuration

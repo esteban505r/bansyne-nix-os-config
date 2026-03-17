@@ -6,47 +6,40 @@
 {
   # Development packages
   environment.systemPackages = with pkgs; [
-    # Version control
-    git
-    gh  # GitHub CLI
-    
-    # Java Development Kit (JDK)
-    jdk21  # Latest LTS JDK, change to jdk17 or jdk11 if needed
-    
-    # IDEs and Editors
-    android-studio  # Android Studio IDE
-    jetbrains.idea  # IntelliJ IDEA (formerly idea-ultimate)
-    code-cursor  # Cursor IDE (latest from nixos-unstable; unfree)
-    
-    # Node.js and version managers
-    nodejs_20  # Node.js LTS
-    nodePackages.npm  # npm package manager
-    # Note: nvm (Node Version Manager) is typically a shell script installed in user's home
-    # For nvm-like functionality in NixOS, consider:
-    # - Using nix-shell with different nodejs versions
-    # - Installing nvm manually: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    # - Using direnv with nix-shell for per-project node versions
-    
-    # Flutter Version Manager
-    fvm  # Flutter Version Manager
-    
-    # Build tools
-    gradle
-    maven
-    
-    # Additional development utilities
-    python3
-    python3Packages.pip
-    
-    # Docker (useful for development)
-    docker
-    docker-compose
-    
-    # Additional tools
-    ripgrep  # Fast text search
-    fd  # Simple and fast alternative to find
-    bat  # Cat clone with syntax highlighting
-    eza  # Modern ls replacement
+    # --- Version control ---
+    git           # Distributed version control
+    gh            # GitHub CLI (PRs, issues, repos from terminal)
+
+    # --- Java ---
+    jdk21         # OpenJDK 21 LTS (use jdk17/jdk11 if needed)
+
+    # --- IDEs and editors ---
+    android-studio   # Android IDE (SDK, emulator, build tools)
+    jetbrains.idea   # IntelliJ IDEA
+    # Cursor is in base (packages.nix) so it’s available in every specialisation
+
+    # Node.js: not installed here; manage manually (nvm, fnm, or nix-shell per project).
+
+    # --- Flutter ---
+    fvm            # Flutter Version Manager (per-project Flutter versions)
+
+    # --- Build tools ---
+    gradle         # Java/Kotlin build tool
+    maven          # Java build and dependency management
+
+    # --- Python ---
+    python3              # Python interpreter
+    python3Packages.pip   # pip package installer
+
+    # --- Containers ---
+    docker         # Container runtime
+    docker-compose # Multi-container orchestration (compose files)
+
+    # --- CLI utilities ---
+    ripgrep        # Fast recursive grep (rg)
+    fd             # Simple, fast find alternative
+    bat            # Cat with syntax highlighting and paging
+    eza            # Modern ls (icons, git status, tree)
   ];
 
   # Enable Java support
