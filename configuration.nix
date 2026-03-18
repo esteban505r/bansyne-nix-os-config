@@ -1,36 +1,8 @@
 # Main NixOS configuration file
 # This file imports all modules and sets the system state version
 
-{ config, pkgs, lib, ... }:
+{ config, pkgs, ... }:
 
-let
-  rootUuid = lib.last (lib.splitString "/" config.fileSystems."/".device);
-  appendSpecialisationEntries = ''
-    ( set +e
-      TOPLEVEL="''$1"
-      [ -z "''$TOPLEVEL" ] && exit 0
-      [ ! -d "''$TOPLEVEL/specialisation" ] && exit 0
-      add_entry() {
-        local name="''$1" display="''$2"
-        local p="''$TOPLEVEL/specialisation/''$name"
-        [ -f "''$p/kernel" ] || return 0
-        local params=$(cat "''$p/kernel-params") init=$(readlink -f "''$p/init")
-        local kernel=$(readlink -f "''$p/kernel") initrd=$(readlink -f "''$p/initrd")
-        cat >> /boot/grub/grub.cfg << ENTRY
-
-    menuentry "NixOS - ''$display" {
-      search --fs-uuid --set=root ${rootUuid}
-      linux ''$kernel init=''$init ''$params
-      initrd ''$initrd
-    }
-    ENTRY
-      }
-      add_entry gaming Gaming
-      add_entry developing Developing
-      true
-    ) || true
-  '';
-in
 {
   # Import hardware configuration
   # NOTE: hardware-configuration.nix is a generated file. You have two options:
@@ -55,11 +27,15 @@ in
     enable = true;
     efiSupport = true;
     device = "nodev";  # EFI: install to ESP (e.g. /boot), not a disk device
+    # Limit generations in the menu
     configurationLimit = 10;
-    configurationName = "Default";
+    # Themed menu (sleek: light/dark/orange/bigSur; override with pkgs.sleek-grub-theme.override { withStyle = "dark"; })
     theme = pkgs.sleek-grub-theme;
-    # Append Gaming/Developing entries when GRUB is installed (toplevel in $1)
-    extraInstallCommands = appendSpecialisationEntries;
+    # Optional: custom background only (if theme is null)
+    # splashImage = null;
+    # splashMode = "stretch";
+    # Font size (when using theme that supports it)
+    # fontSize = 24;
   };
 
   # Enable flakes and nix-command
@@ -73,17 +49,21 @@ in
   # System state version - should match your NixOS release
   system.stateVersion = "25.11";
 
-  # Specialisations - create different boot entries (shown next to "NixOS - Default" in GRUB)
-  # After rebuild, run: sudo nixos-rebuild boot  (then reboot to see entries)
-  # If Gaming/Developing don't appear, check: ls /run/current-system/specialisation/
+  # Specialisations - create different boot entries with different configurations
+  # Access specialisations at boot by selecting them from the boot menu
   specialisation = {
+    # Gaming specialisation - includes RetroArch, Dolphin, and Steam
     gaming.configuration = {
-      imports = [ ./modules/gaming.nix ];
-      boot.loader.grub.configurationName = lib.mkForce "Gaming";
+      imports = [
+        ./modules/gaming.nix
+      ];
     };
+    
+    # Development specialisation - includes Android Studio, Cursor, nvm, fvm, JDK, IntelliJ, Git, etc.
     developing.configuration = {
-      imports = [ ./modules/developing.nix ];
-      boot.loader.grub.configurationName = lib.mkForce "Developing";
+      imports = [
+        ./modules/developing.nix
+      ];
     };
   };
 }

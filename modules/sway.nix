@@ -1,8 +1,47 @@
 # Sway window manager configuration
 # Includes XDG portal configuration for Wayland applications
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, wallpapersDir ? null, ... }:
 
+let
+  # Default Sway config with the built-in bar block removed (Waybar is our only bar).
+  # Must append include so config.d (nixos.conf, waybar-reload, etc.) is loaded.
+  swayConfigWithoutBar = pkgs.runCommand "sway-config-no-bar" { } ''
+    awk '
+      /^# Read.*sway-bar/ { inbar = 1; depth = 0; next }
+      inbar {
+        if (/bar \{/ || /\{/) depth++
+        if (/\}/) depth--
+        if (depth <= 0) inbar = 0
+        next
+      }
+      { print }
+    ' ${pkgs.sway}/etc/sway/config > $out
+    echo "" >> $out
+    echo "include /etc/sway/config.d/*" >> $out
+  '';
+  # Random wallpaper script: swaybg with nohup so it survives after script exits
+  randomWallpaper = pkgs.writeShellScriptBin "sway-random-wallpaper" ''
+    set -e
+    WALLPAPER_DIR="''${SWAY_WALLPAPERS:-$HOME/.config/sway/wallpapers}"
+    mkdir -p "$WALLPAPER_DIR"
+    IMG=$(find "$WALLPAPER_DIR" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) 2>/dev/null | shuf -n1)
+    if [ -z "$IMG" ] && [ "$WALLPAPER_DIR" = "/etc/sway/wallpapers" ] && [ -d "$HOME/.config/sway/wallpapers" ]; then
+      IMG=$(find "$HOME/.config/sway/wallpapers" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) 2>/dev/null | shuf -n1)
+    fi
+    if [ -z "$IMG" ] && [ -d "/etc/sway/wallpapers" ]; then
+      IMG=$(find /etc/sway/wallpapers -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) 2>/dev/null | head -1)
+    fi
+    if [ -z "$IMG" ] && [ -f "${pkgs.sway}/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png" ]; then
+      IMG="${pkgs.sway}/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png"
+    fi
+    if [ -n "$IMG" ]; then
+      pkill swaybg 2>/dev/null || true
+      nohup ${pkgs.swaybg}/bin/swaybg -i "$IMG" -m fill </dev/null >/dev/null 2>&1 &
+      disown 2>/dev/null || true
+    fi
+  '';
+in
 {
   # Enable Sway with GTK wrapper features
   programs.sway = {
@@ -10,12 +49,20 @@
     wrapperFeatures.gtk = true;
   };
 
-  # Nerd Font for Waybar icons
-  fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
+  # Use custom Sway config without the default top bar (only Waybar at bottom)
+  environment.etc."sway/config".source = swayConfigWithoutBar;
+
+  # Wallpapers from repo (wallpapers/) → /etc/sway/wallpapers; empty dir when not provided so option is always set
+  environment.etc."sway/wallpapers".source =
+    if wallpapersDir != null then wallpapersDir
+    else pkgs.runCommand "empty-wallpapers" { } "mkdir -p $out";
+
+  # Emoji font so Waybar icon symbols (Unicode emoji) render
+  fonts.packages = [ pkgs.noto-fonts-color-emoji ];
 
   # Enable Waybar (status bar for Sway), positioned at bottom
   programs.waybar.enable = true;
-  # Waybar config: defines which blocks/modules appear (left, center, right)
+  # Waybar config: Unicode emoji/symbols via Pango &#xNNNN; (no Nerd Font needed)
   environment.etc."waybar/config".source = pkgs.writeText "waybar-config.json" ''
     {
       "layer": "top",
@@ -27,52 +74,52 @@
       "sway/workspaces": {
         "format": "{name}",
         "format-icons": {
-          "default": "${"\uF111"}",
-          "active": "${"\uF192"}",
-          "urgent": "${"\uF12A"}"
+          "default": "&#x25CB;",
+          "active": "&#x25CF;",
+          "urgent": "&#x26A0;"
         }
       },
       "cpu": {
-        "format": "${"\uF2DB"} {usage}%",
+        "format": "&#x2699; CPU {usage}%",
         "interval": 2
       },
       "memory": {
-        "format": "${"\uF538"} {}%",
+        "format": "&#x1F4BE; MEM {}%",
         "interval": 2
       },
       "disk": {
-        "format": "${"\uF0A0"} {percentage_used}%",
+        "format": "&#x1F4BF; DISK {percentage_used}%",
         "path": "/",
         "interval": 30
       },
       "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-muted": "${"\uF6A9"} muted",
+        "format": "{icon} VOL {volume}%",
+        "format-muted": "&#x1F507; VOL muted",
         "format-icons": {
-          "default": ["${"\uF026"}", "${"\uF027"}", "${"\uF028"}"],
-          "muted": "${"\uF6A9"}"
+          "default": ["&#x1F508;", "&#x1F509;", "&#x1F50A;"],
+          "muted": "&#x1F507;"
         },
         "tooltip-format": "{desc}: {volume}%"
       },
       "backlight": {
-        "format": "{icon} {percent}%",
-        "format-icons": ["${"\uF5CF"}", "${"\uF5CE"}", "${"\uF5DD"}", "${"\uF5DE"}", "${"\uF185"}"]
+        "format": "{icon} BRIGHT {percent}%",
+        "format-icons": ["&#x1F505;", "&#x1F505;", "&#x2600;", "&#x2600;", "&#x2600;"]
       },
       "keyboard": {
-        "format": "${"\uF11C"} {layout}",
+        "format": "&#x2328; KB {layout}",
         "tooltip-format": "Layout: {layout}"
       },
       "network": {
-        "format-wifi": "${"\uF1EB"} {signalStrength}%",
-        "format-ethernet": "${"\uF0AC"} connected",
-        "format-disconnected": "${"\uF071"} disconnected",
+        "format-wifi": "&#x1F4F6; WIFI {signalStrength}%",
+        "format-ethernet": "&#x1F310; ETH connected",
+        "format-disconnected": "&#x26A0; NET disconnected",
         "tooltip-format": "{ifname}: {ipaddr}"
       },
       "battery": {
-        "format": "{icon} {capacity}%",
-        "format-charging": "${"\uF0E7"} {capacity}%",
-        "format-plugged": "${"\uF1E6"} {capacity}%",
-        "format-icons": ["${"\uF244"}", "${"\uF243"}", "${"\uF242"}", "${"\uF241"}", "${"\uF240"}"],
+        "format": "{icon} BAT {capacity}%",
+        "format-charging": "&#x26A1; BAT {capacity}%",
+        "format-plugged": "&#x1F50C; BAT {capacity}%",
+        "format-icons": ["&#x1F50B;", "&#x1F50B;", "&#x1F50B;", "&#x1F50B;", "&#x1F50B;"],
         "interval": 10
       },
       "tray": {
@@ -80,17 +127,17 @@
         "spacing": 6
       },
       "clock": {
-        "format": "${"\uF017"} {:%H:%M %d/%m}",
+        "format": "&#x1F550; {:%H:%M %d/%m}",
         "tooltip-format": "<big>{:%A %d %B %Y}</big>\n<tt><small>{:%H:%M}</small></tt>"
       }
     }
   '';
-  # Waybar style: orange background, black text, icons via Nerd Font
+  # Waybar style: orange background, black text
   environment.etc."waybar/style.css".source = pkgs.writeText "waybar-style.css" ''
     * {
       border: none;
       border-radius: 0;
-      font-family: "JetBrains Mono Nerd Font", "JetBrainsMono Nerd Font", sans-serif;
+      font-family: sans-serif;
       font-size: 13px;
       min-height: 0;
     }
@@ -132,17 +179,33 @@
     }
   '';
 
-  # Reload Waybar (apply config/style after rebuild): Super+Shift+w, or: systemctl --user restart waybar
-  environment.etc."sway/config.d/waybar-reload.conf".source = pkgs.writeText "waybar-reload.conf" ''
-    bindsym $mod+Shift+w exec systemctl --user restart waybar
+  # Auto-start Flameshot (tray icon; use GUI or keybinding to take screenshots)
+  environment.etc."sway/config.d/flameshot.conf".source = pkgs.writeText "flameshot.conf" ''
+    exec --no-startup-id flameshot
   '';
 
-  # Override waybar systemd user service: use our bottom config and start after Sway (sway-session.target)
-  # so waybar appears at startup instead of requiring a manual restart
+  # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
+  environment.etc."sway/config.d/waybar-reload.conf".source = pkgs.writeText "waybar-reload.conf" ''
+    exec --no-startup-id sh -c 'pgrep -x waybar >/dev/null || exec waybar'
+    bindsym $mod+Shift+w exec sh -c 'pkill -x waybar 2>/dev/null; waybar &'
+  '';
+
+  # Wallpaper: run after delay; inherit Sway env via wrapper so WAYLAND_DISPLAY is set
+  environment.etc."sway/config.d/wallpaper.conf".source = pkgs.writeText "wallpaper.conf" (
+    if wallpapersDir != null then ''
+      exec --no-startup-id sh -c 'sleep 5 && SWAY_WALLPAPERS=/etc/sway/wallpapers exec ${randomWallpaper}/bin/sway-random-wallpaper'
+      bindsym $mod+Shift+b exec env SWAY_WALLPAPERS=/etc/sway/wallpapers ${randomWallpaper}/bin/sway-random-wallpaper
+    '' else ''
+      exec --no-startup-id sh -c 'sleep 5 && exec ${randomWallpaper}/bin/sway-random-wallpaper'
+      bindsym $mod+Shift+b exec ${randomWallpaper}/bin/sway-random-wallpaper
+    ''
+  );
+
+  # Waybar systemd service: custom ExecStart; do NOT auto-start (Sway runs waybar via exec to avoid two bars). Restart with Super+Shift+w.
+  systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
   systemd.user.services.waybar.unitConfig = {
     PartOf = [ "sway-session.target" ];
     After = [ "sway-session.target" ];
-    Requisite = [ "sway-session.target" ];
   };
   systemd.user.services.waybar.serviceConfig.ExecStart = [
     "" # clear default
@@ -152,6 +215,8 @@
     (pkgs.writeShellScriptBin "waybar" ''
       exec ${pkgs.waybar}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css "$@"
     '')
+    pkgs.swaybg
+    randomWallpaper
   ];
 
   # Enable XDG portals for Wayland applications

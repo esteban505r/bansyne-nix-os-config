@@ -11,7 +11,9 @@
     swayidle      # Idle management (lock, dpms, etc.)
     foot          # Fast, minimal terminal emulator
     grim          # Screenshot tool for Wayland
+    discord       # Discord for chatting
     slurp         # Region selector (used with grim for area screenshots)
+    flameshot     # Screenshot tool (GUI, region, tray); auto-started in Sway
     wl-clipboard  # Copy/paste for Wayland (wl-copy, wl-paste)
 
     # --- Bluetooth ---
@@ -25,5 +27,7 @@
     # --- Applications ---
     google-chrome # Chromium-based browser (unfree)
     code-cursor  # Cursor IDE (unfree; available in all specialisations)
+    obsidian     # Markdown-based note-taking and knowledge base
+    thunar       # File manager (GUI)
   ];
 }
