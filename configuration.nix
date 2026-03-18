@@ -16,8 +16,9 @@
     ./modules/packages.nix
     ./modules/audio.nix
     ./modules/bluetooth.nix
-    #./modules/removable-storage.nix
+    ./modules/removable-storage.nix
     ./modules/sway.nix
+    ./modules/developing.nix
   ];
 
 
@@ -65,13 +66,6 @@
     gaming.configuration = {
       imports = [
         ./modules/gaming.nix
-      ];
-    };
-    
-    # Development specialisation - includes Android Studio, Cursor, nvm, fvm, JDK, IntelliJ, Git, etc.
-    developing.configuration = {
-      imports = [
-        ./modules/developing.nix
       ];
     };
   };

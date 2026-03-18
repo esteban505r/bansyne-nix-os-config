@@ -41,6 +41,8 @@ let
       disown 2>/dev/null || true
     fi
   '';
+  # SDDM login theme (flavor: latte/frappe/macchiato/mocha; accent: blue/mauve/teal/...)
+  sddmTheme = pkgs.catppuccin-sddm.override { flavor = "mocha"; accent = "mauve"; };
 in
 {
   # Enable Sway with GTK wrapper features
@@ -182,9 +184,15 @@ in
     }
   '';
 
+  # Default terminal: override Sway default ($term is "foot" in upstream config)
+  environment.etc."sway/config.d/terminal.conf".source = pkgs.writeText "terminal.conf" ''
+    set $term alacritty
+  '';
+
   # Auto-start Flameshot (tray icon; use GUI or keybinding to take screenshots)
   environment.etc."sway/config.d/flameshot.conf".source = pkgs.writeText "flameshot.conf" ''
     exec --no-startup-id flameshot
+    bindsym Print exec flameshot gui
   '';
 
   # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
@@ -220,6 +228,7 @@ in
     '')
     pkgs.swaybg
     randomWallpaper
+    sddmTheme
   ];
 
   # Enable XDG portals for Wayland applications
@@ -231,13 +240,32 @@ in
     # extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
   };
 
-  # Display manager configuration
-  services.displayManager.sddm.enable = true;
-  services.displayManager.sddm.wayland.enable = true;
+  # Display manager configuration (graphical login)
+  services.displayManager.sddm = {
+    enable = true;
+    wayland.enable = true;
+    # Theme: use a theme from nixpkgs (must be in extraPackages so SDDM can load it)
+    # Popular options: catppuccin-sddm, sddm-sugar-dark, sddm-chili-theme, elegant-sddm, sddm-astronaut
+    theme = "catppuccin-mocha-mauve";
+    extraPackages = [ sddmTheme ];
+    # Optional: override theme settings (background, font, etc.)
+    # settings = {
+    #   Theme = {
+    #     CursorTheme = "Adwaita";
+    #     Font = "Sans 12";
+    #   };
+    # };
+  };
 
   # Configure keymap
   services.xserver.xkb = {
     layout = "us";
     variant = "";
+  };
+
+  # Default terminal for desktop (e.g. "Open terminal here", app launchers)
+  xdg.terminal-exec = {
+    enable = true;
+    settings.default = [ "Alacritty.desktop" ];
   };
 }

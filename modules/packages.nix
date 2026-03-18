@@ -9,8 +9,9 @@
     sway          # i3-compatible Wayland compositor (tiling WM)
     swaylock      # Screen lock for Sway
     swayidle      # Idle management (lock, dpms, etc.)
-    foot          # Fast, minimal terminal emulator
-    grim          # Screenshot tool for Wayland
+    alacritty     # Terminal
+    grim          # Screenshot tool for Wayland (terminal-only)
+    sway-contrib.grimshot  # Screenshot helper for Sway (grim-based)
     discord       # Discord for chatting
     slurp         # Region selector (used with grim for area screenshots)
     flameshot     # Screenshot tool (GUI, region, tray); auto-started in Sway
@@ -23,6 +24,8 @@
     git           # Version control
     wget          # Download files (HTTP/HTTPS/FTP)
     curl          # Transfer data from URLs (scripts, APIs)
+    xev           # Event monitor
+    neovim        # Neo Vim Editor
 
     # --- Applications ---
     google-chrome # Chromium-based browser (unfree)
