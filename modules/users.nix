@@ -13,7 +13,7 @@
   users.users.bansyne = {
     isNormalUser = true;
     description = "bansyne";
-    extraGroups = [ "networkmanager" "wheel" "audio" "video" ];
+    extraGroups = [ "networkmanager" "wheel" "audio" "video" "storage" ]; # storage = mount removable media via udisks2
     # User packages are defined in packages.nix
     packages = with pkgs; [];
   };
