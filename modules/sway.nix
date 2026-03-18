@@ -80,16 +80,19 @@ in
         }
       },
       "cpu": {
-        "format": "&#x2699; CPU {usage}%",
+        "format": "&#x2699; CPU {usage}% load {load}",
+        "tooltip-format": "CPU: {usage}% usage, load avg {load}",
         "interval": 2
       },
       "memory": {
-        "format": "&#x1F4BE; MEM {}%",
+        "format": "&#x1F4BE; MEM {used:0.1f}G/{total:0.1f}G ({percentage}%)",
+        "tooltip-format": "RAM: {used:0.2f}G used, {avail:0.2f}G avail of {total:0.2f}G",
         "interval": 2
       },
       "disk": {
-        "format": "&#x1F4BF; DISK {percentage_used}%",
+        "format": "&#x1F4BF; DISK {used:0.1f}G/{total:0.1f}G ({percentage_used}%)",
         "path": "/",
+        "tooltip-format": "{path}: {used:0.2f}G used, {free:0.2f}G free of {total:0.2f}G",
         "interval": 30
       },
       "pulseaudio": {
@@ -187,7 +190,7 @@ in
   # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
   environment.etc."sway/config.d/waybar-reload.conf".source = pkgs.writeText "waybar-reload.conf" ''
     exec --no-startup-id sh -c 'pgrep -x waybar >/dev/null || exec waybar'
-    bindsym $mod+Shift+w exec sh -c 'pkill -x waybar 2>/dev/null; waybar &'
+    bindsym $mod+Shift+w exec sh -c 'pkill -x waybar 2>/dev/null; while pgrep -x waybar >/dev/null; do sleep 0.1; done; waybar &'
   '';
 
   # Wallpaper: run after delay; inherit Sway env via wrapper so WAYLAND_DISPLAY is set

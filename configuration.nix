@@ -44,8 +44,16 @@
     experimental-features = [ "nix-command" "flakes" ];
   };
 
+  # Run non-Nix dynamically linked binaries (e.g. node/npm from nvm)
+  # See: https://nix.dev/permalink/stub-ld
+  programs.nix-ld.enable = true;
+
   # Allow unfree packages (required for google-chrome, steam, android-studio, intellij, etc.)
   nixpkgs.config.allowUnfree = true;
+
+  # OpenGL: required so libGL.so.1 is available (e.g. for JetBrains IDEs/Skiko, Android Studio, games).
+  # Libraries are symlinked to /run/opengl-driver/lib. See: https://wiki.nixos.org/wiki/OpenGL
+  hardware.graphics.enable = true;
 
   # System state version - should match your NixOS release
   system.stateVersion = "25.11";
