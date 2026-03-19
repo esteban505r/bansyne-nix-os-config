@@ -36,6 +36,7 @@ in
 
     # --- IDEs and editors ---
     android-studio-wrapped   # Android IDE (wrapped so Skiko/Compose can find libGL)
+    android-tools # adb, fastboot (Android Debug Bridge; in PATH)
     idea-wrapped      # IntelliJ IDEA (wrapped so Skiko/Compose can find libGL)
     # Cursor is in base (packages.nix) so it’s available in every specialisation
 

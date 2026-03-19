@@ -4,7 +4,7 @@
 { config, pkgs, ... }:
 
 {
-  # Enable NVIDIA driver (requires unfree, already set in your config)
+  # Enable NVIDIA driver (requires unfree)
   services.xserver.videoDrivers = [ "nvidia" ];
 
   hardware.nvidia = {
