@@ -13,21 +13,68 @@
 #    Android Studio (its FHS env does not pass LD_LIBRARY_PATH to the JVM that loads ~/.skiko).
 # 3. Wrappers set LD_LIBRARY_PATH to /run/opengl-driver/lib (NixOS standard) plus mesa/libglvnd
 #    so the JVM finds libGL.so.1 when loading Skiko.
+# 4. JBR's AWT (libawt_xawt.so) needs X11 libs (libXext, libX11, etc.) for Compose desktop / Swing;
+#    include them so Run configurations (e.g. Compose Multiplatform desktop) find them.
 
 { config, pkgs, lib, ... }:
 
 let
-  # NixOS OpenGL driver path (populated when hardware.graphics.enable = true) + mesa/libglvnd for libGL.so.1
-  libPath = "/run/opengl-driver/lib:" + lib.makeLibraryPath [ pkgs.mesa pkgs.libglvnd ];
+  # OpenGL + X11 + fonts + emulator: NixOS OpenGL path, mesa/libglvnd for libGL; X11 for JBR AWT;
+  # freetype for libfontmanager; libpng for Android emulator QEMU (qemu-system-x86_64).
+  libPath = "/run/opengl-driver/lib:" + lib.makeLibraryPath [
+    pkgs.mesa
+    pkgs.libglvnd
+    pkgs.libX11
+    pkgs.libXext
+    pkgs.libXrender
+    pkgs.libXtst
+    pkgs.libXi
+    pkgs.libXrandr
+    pkgs.libXcursor
+    pkgs.libXfixes
+    pkgs.freetype
+    pkgs.fontconfig
+    pkgs.libpng
+    pkgs.nspr
+    pkgs.nss
+    pkgs.expat
+    pkgs.libdrm
+    pkgs.libxcb
+    pkgs.libxkbfile
+    pkgs.libbsd
+    # Qt xcb platform plugin (emulator UI): needs libxcb-cursor and related xcb-util libs
+    pkgs.xcbutilcursor
+    pkgs.xcbutilwm
+    pkgs.xcbutilkeysyms
+    pkgs.xcbutilimage
+    pkgs.xcbutil
+    # Qt xcb plugin (keyboard / toolkit glue)
+    pkgs.libxkbcommon
+    pkgs.zlib
+    pkgs.libICE
+    pkgs.libSM
+    pkgs.glib
+  ];
+  # On Wayland (e.g. Sway) the emulator's Qt UI often lacks the Wayland plugin and falls back to
+  # software rendering, causing lag. Forcing xcb uses XWayland and restores GPU-accelerated window.
   wrapJetbrains = name: pkg: binName:
     pkgs.writeShellScriptBin binName ''
       export LD_LIBRARY_PATH="${libPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      export QT_QPA_PLATFORM=xcb
+      export _JAVA_AWT_WM_NONREPARENTING=1
       exec ${pkg}/bin/${binName} "$@"
     '';
   android-studio-wrapped = wrapJetbrains "android-studio" pkgs.android-studio "android-studio";
   idea-wrapped = wrapJetbrains "idea" pkgs.jetbrains.idea "idea";
 in
 {
+  # Studio runs $ANDROID_HOME/emulator/emulator by full path; child processes may not see the
+  # IDE wrapper's LD_LIBRARY_PATH. Export the same lib path for the whole Sway session so Qt's
+  # xcb platform plugin (emulator UI) can load libxcb-cursor and friends.
+  programs.sway.extraSessionCommands = lib.mkIf config.programs.sway.enable (lib.mkAfter ''
+    export LD_LIBRARY_PATH="${libPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  '');
+
   # Development packages
   environment.systemPackages = with pkgs; [
     # --- Version control ---
@@ -75,6 +122,15 @@ in
 
   # Note: Android Studio is installed as a package above
   # There is no programs.android-studio option in NixOS
+  #
+  # --- Android Emulator performance (NixOS + Sway/Wayland) ---
+  # If the emulator is slow after starting to use it, try:
+  # 1. AVD Manager → Edit AVD → Show Advanced → Emulated Performance:
+  #    - Graphics: "Hardware - GLES 2.0" (or "Automatic"); OpenGL ES renderer: "Desktop native OpenGL", API: max.
+  #    - Disable "Auto-save current state to Quickboot" (snapshots cause I/O stalls).
+  # 2. Verify KVM: ~/Android/Sdk/emulator/emulator -accel-check (should show KVM (Linux) yes).
+  # 3. If still slow, try running with: steam-run ~/Android/Sdk/emulator/emulator -avd YOUR_AVD -feature -Vulkan
+  # 4. Wrapper and emulator() already set QT_QPA_PLATFORM=xcb so the emulator window uses XWayland (GPU) on Sway.
 
   # Enable Docker
   virtualisation.docker = {

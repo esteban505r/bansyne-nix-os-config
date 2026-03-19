@@ -67,7 +67,9 @@
 
   # OpenGL: required so libGL.so.1 is available (e.g. for JetBrains IDEs/Skiko, Android Studio, games).
   # Libraries are symlinked to /run/opengl-driver/lib. See: https://wiki.nixos.org/wiki/OpenGL
+  # enable32Bit: 32-bit OpenGL/Vulkan libs for Android emulator and some games (e.g. Steam).
   hardware.graphics.enable = true;
+  hardware.graphics.enable32Bit = true;
 
   # System state version - should match your NixOS release
   system.stateVersion = "25.11";
