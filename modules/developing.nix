@@ -89,7 +89,8 @@ in
   # Environment variables for development
   environment.variables = {
     # JAVA_HOME is set by programs.java
-    # Android SDK path (Android Studio sets this, but explicit is better)
-    ANDROID_HOME = "$HOME/.android/sdk";
+    # Android SDK path (on Linux, Android Studio typically defaults to ~/Android/Sdk).
+    ANDROID_HOME = "$HOME/Android/Sdk";
+    ANDROID_SDK_ROOT = "$HOME/Android/Sdk";
   };
 }

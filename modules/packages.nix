@@ -6,7 +6,7 @@
 {
   environment.systemPackages = with pkgs; [
     # --- Window manager and Wayland ---
-    sway          # i3-compatible Wayland compositor (tiling WM)
+    # sway: provided by programs.sway (wrapped with --unsupported-gpu for NVIDIA); do not add pkgs.sway here or SDDM will run unwrapped sway and get black screen
     swaylock      # Screen lock for Sway
     swayidle      # Idle management (lock, dpms, etc.)
     alacritty     # Terminal

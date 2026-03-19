@@ -33,7 +33,13 @@ in
   # Enable Sway with GTK wrapper features
   programs.sway = {
     enable = true;
-    wrapperFeatures.gtk = true;
+    wrapperFeatures = {
+      # Ensure the wrapper/session entrypoint is used by display managers (including SDDM).
+      base = true;
+      gtk = true;
+    };
+    # Required for NVIDIA proprietary driver: avoids black screen on session start (unsupported by Sway upstream)
+    extraOptions = [ "--unsupported-gpu" ];
   };
 
   # Use custom Sway config without the default top bar (only Waybar at bottom) without the default top bar (only Waybar at bottom)

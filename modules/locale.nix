@@ -34,5 +34,7 @@
     NIXOS_OZONE_WL = "1";
     # Set desktop environment for XDG portals
     XDG_CURRENT_DESKTOP = "sway";
+    # NVIDIA + Sway: software cursor avoids invisible cursor with proprietary driver
+    WLR_NO_HARDWARE_CURSORS = "1";
   };
 }

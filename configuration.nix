@@ -17,7 +17,6 @@
     ./modules/audio.nix
     ./modules/bluetooth.nix
     ./modules/removable-storage.nix
-    ./modules/amd.nix
     ./modules/nvidia.nix
     ./modules/sway.nix
     ./modules/developing.nix

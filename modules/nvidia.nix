@@ -13,7 +13,7 @@
     # Required for Wayland (Sway)
     modesetting.enable = true;
     # Optional: enable power management (can help with suspend/resume)
-    # powerManagement.enable = true;
+    powerManagement.enable = true;
     # Optional: enable fine-grained power management (Turing+)
     # powerManagement.finegrained = false;
     # Optional: use a specific driver version (default: stable)
