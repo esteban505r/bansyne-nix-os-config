@@ -10,7 +10,7 @@ Personal NixOS system configuration for **bansyne**, using a modular layout and 
 |------|--------|
 | **State version** | 25.11 |
 | **Channel** | `nixos-unstable` (via flake) |
-| **Bootloader** | GRUB (EFI) with sleek theme |
+| **Bootloader** | GRUB (EFI) with sleek theme; NixOS generations, specialisations, and other OSes (e.g. Windows) |
 | **Display** | Wayland via Sway |
 | **Login** | SDDM (Catppuccin Mocha Mauve) |
 | **Audio** | Pipewire (ALSA + Pulse compat) |
@@ -43,8 +43,8 @@ Personal NixOS system configuration for **bansyne**, using a modular layout and 
 ## Main Configuration (`configuration.nix`)
 
 - **Imports** all modules above (hardware, locale, users, packages, audio, bluetooth, removable-storage, sway, developing).
-- **Boot**: EFI + GRUB, theme `sleek-grub-theme`, `configurationLimit = 10`.
-- **Nix**: flakes + nix-command enabled; unfree allowed; `programs.nix-ld.enable` for running non-Nix dynamic binaries (e.g. nvm node).
+- **Boot**: EFI + GRUB, theme `sleek-grub-theme`, `configurationLimit = 10`, `gfxmodeEfi` for a higher-resolution boot menu. `useOSProber = true` so other installed OSes (e.g. Windows) appear in the menu.
+- **Nix**: flakes + nix-command enabled; unfree allowed; `programs.nix-ld.enable` for running non-Nix dynamic binaries (e.g. nvm node). **Automatic GC**: weekly timer removes generations older than 7 days (`nix.gc`).
 - **Graphics**: `hardware.graphics.enable = true` (OpenGL / libGL for IDEs and games).
 - **Specialisations**: `gaming` — adds `modules/gaming.nix`; select **“gaming”** at the GRUB menu to boot with Steam, RetroArch, Dolphin, etc.
 
@@ -165,9 +165,9 @@ cd /path/to/bansyne-nix-os-config
 sudo nixos-rebuild switch --flake .#nixos
 ```
 
-### Boot into gaming specialisation
+### Boot menu
 
-Choose **“gaming”** (or the named specialisation) from the GRUB menu; the default entry is the normal configuration.
+The GRUB menu lists NixOS generations (up to 10), specialisations (e.g. **“gaming”**), and other installed operating systems (e.g. **Windows**). The default entry is the current NixOS configuration. Choose **“gaming”** to boot with Steam, RetroArch, Dolphin, etc.
 
 ### Wallpapers
 
@@ -182,6 +182,26 @@ sudo nixos-generate-config --show-hardware-config > hardware-configuration.nix
 ```
 
 Then run `nixos-rebuild switch --flake .#nixos` as above.
+
+### Removing old generations
+
+**Automatic:** A systemd timer runs **weekly** (Monday 03:15) and deletes generations older than 7 days, then runs garbage collection (`nix.gc` in `configuration.nix`). You can change the schedule or use `options = [ "-d" ]` to keep only the current generation.
+
+**Manual:** `configurationLimit = 10` only limits GRUB menu entries; old generations still use disk until GC runs. To clean up on demand:
+
+1. **List generations** (optional):  
+   `nixos-rebuild list-generations`
+
+2. **Delete old generations and free disk**:  
+   `sudo nix-collect-garbage -d`  
+   (all but current) or  
+   `sudo nix-collect-garbage --delete-older-than 7d`  
+   (keep last 7 days).
+
+3. **Refresh the boot menu** (so GRUB no longer shows removed entries):  
+   `sudo nixos-rebuild switch --flake .#nixos`
+
+Note: deleted generations cannot be rolled back to.
 
 ---
 

@@ -1,7 +1,7 @@
 # Sway window manager configuration
 # Includes XDG portal configuration for Wayland applications
 
-{ config, pkgs, lib, wallpapersDir ? null, ... }:
+{ config, pkgs, lib, ... }:
 
 let
   # Default Sway config with the built-in bar block removed (Waybar is our only bar).
@@ -15,34 +15,19 @@ let
         if (depth <= 0) inbar = 0
         next
       }
+      /# Special key to take a screenshot with grim/ { next }
+      /bindsym Print exec grim/ { next }
+      /# Your preferred terminal emulator/ { next }
+      /^set \$term / { next }
+      /# Start a terminal/ { next }
+      /bindsym \$mod\+Return exec \$term/ { next }
       { print }
     ' ${pkgs.sway}/etc/sway/config > $out
     echo "" >> $out
     echo "include /etc/sway/config.d/*" >> $out
   '';
-  # Random wallpaper script: swaybg with nohup so it survives after script exits
-  randomWallpaper = pkgs.writeShellScriptBin "sway-random-wallpaper" ''
-    set -e
-    WALLPAPER_DIR="''${SWAY_WALLPAPERS:-$HOME/.config/sway/wallpapers}"
-    mkdir -p "$WALLPAPER_DIR"
-    IMG=$(find "$WALLPAPER_DIR" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) 2>/dev/null | shuf -n1)
-    if [ -z "$IMG" ] && [ "$WALLPAPER_DIR" = "/etc/sway/wallpapers" ] && [ -d "$HOME/.config/sway/wallpapers" ]; then
-      IMG=$(find "$HOME/.config/sway/wallpapers" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) 2>/dev/null | shuf -n1)
-    fi
-    if [ -z "$IMG" ] && [ -d "/etc/sway/wallpapers" ]; then
-      IMG=$(find /etc/sway/wallpapers -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) 2>/dev/null | head -1)
-    fi
-    if [ -z "$IMG" ] && [ -f "${pkgs.sway}/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png" ]; then
-      IMG="${pkgs.sway}/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png"
-    fi
-    if [ -n "$IMG" ]; then
-      pkill swaybg 2>/dev/null || true
-      nohup ${pkgs.swaybg}/bin/swaybg -i "$IMG" -m fill </dev/null >/dev/null 2>&1 &
-      disown 2>/dev/null || true
-    fi
-  '';
-  # SDDM login theme (flavor: latte/frappe/macchiato/mocha; accent: blue/mauve/teal/...)
-  sddmTheme = pkgs.catppuccin-sddm.override { flavor = "mocha"; accent = "mauve"; };
+  # SDDM login theme (flavor: latte/frappe/macchiato/mocha; accent: blue/mauve/teal/...). Theme name must match: catppuccin-{flavor}-{accent}
+  sddmTheme = pkgs.catppuccin-sddm.override { flavor = "macchiato"; accent = "teal"; };
 in
 {
   # Enable Sway with GTK wrapper features
@@ -51,13 +36,8 @@ in
     wrapperFeatures.gtk = true;
   };
 
-  # Use custom Sway config without the default top bar (only Waybar at bottom)
+  # Use custom Sway config without the default top bar (only Waybar at bottom) without the default top bar (only Waybar at bottom)
   environment.etc."sway/config".source = swayConfigWithoutBar;
-
-  # Wallpapers from repo (wallpapers/) → /etc/sway/wallpapers; empty dir when not provided so option is always set
-  environment.etc."sway/wallpapers".source =
-    if wallpapersDir != null then wallpapersDir
-    else pkgs.runCommand "empty-wallpapers" { } "mkdir -p $out";
 
   # Emoji font so Waybar icon symbols (Unicode emoji) render
   fonts.packages = [ pkgs.noto-fonts-color-emoji ];
@@ -184,15 +164,24 @@ in
     }
   '';
 
-  # Default terminal: override Sway default ($term is "foot" in upstream config)
+  # Default terminal: set $term and redefine Mod+Return (Sway expands $term when config is parsed, so we must redefine the binding here)
   environment.etc."sway/config.d/terminal.conf".source = pkgs.writeText "terminal.conf" ''
     set $term alacritty
+    bindsym $mod+Return exec $term
   '';
 
   # Auto-start Flameshot (tray icon; use GUI or keybinding to take screenshots)
+  # Window rule: place overlay at (0,0) so it spans all monitors (fixes multi-monitor capture)
   environment.etc."sway/config.d/flameshot.conf".source = pkgs.writeText "flameshot.conf" ''
+    for_window [app_id="flameshot"] floating enable, fullscreen disable, move absolute position 0 0, border pixel 0
     exec --no-startup-id flameshot
     bindsym Print exec flameshot gui
+  '';
+
+  # Wallpaper from /home/bansyne/bansyne-nix-os-config/wallpapers (random at startup, $mod+Shift+b to change)
+  environment.etc."sway/config.d/wallpaper.conf".source = pkgs.writeText "wallpaper.conf" ''
+    exec --no-startup-id sh -c "sleep 5; IMG=$(find /home/bansyne/bansyne-nix-os-config/wallpapers -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1); [ -n \"$IMG\" ] && swaymsg output '*' bg \"$IMG\" fill"
+    bindsym $mod+Shift+b exec sh -c "IMG=$(find /home/bansyne/bansyne-nix-os-config/wallpapers -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1); [ -n \"$IMG\" ] && swaymsg output '*' bg \"$IMG\" fill"
   '';
 
   # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
@@ -200,17 +189,6 @@ in
     exec --no-startup-id sh -c 'pgrep -x waybar >/dev/null || exec waybar'
     bindsym $mod+Shift+w exec sh -c 'pkill -x waybar 2>/dev/null; while pgrep -x waybar >/dev/null; do sleep 0.1; done; waybar &'
   '';
-
-  # Wallpaper: run after delay; inherit Sway env via wrapper so WAYLAND_DISPLAY is set
-  environment.etc."sway/config.d/wallpaper.conf".source = pkgs.writeText "wallpaper.conf" (
-    if wallpapersDir != null then ''
-      exec --no-startup-id sh -c 'sleep 5 && SWAY_WALLPAPERS=/etc/sway/wallpapers exec ${randomWallpaper}/bin/sway-random-wallpaper'
-      bindsym $mod+Shift+b exec env SWAY_WALLPAPERS=/etc/sway/wallpapers ${randomWallpaper}/bin/sway-random-wallpaper
-    '' else ''
-      exec --no-startup-id sh -c 'sleep 5 && exec ${randomWallpaper}/bin/sway-random-wallpaper'
-      bindsym $mod+Shift+b exec ${randomWallpaper}/bin/sway-random-wallpaper
-    ''
-  );
 
   # Waybar systemd service: custom ExecStart; do NOT auto-start (Sway runs waybar via exec to avoid two bars). Restart with Super+Shift+w.
   systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
@@ -226,9 +204,8 @@ in
     (pkgs.writeShellScriptBin "waybar" ''
       exec ${pkgs.waybar}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css "$@"
     '')
-    pkgs.swaybg
-    randomWallpaper
     sddmTheme
+    pkgs.swaybg
   ];
 
   # Enable XDG portals for Wayland applications
@@ -246,7 +223,7 @@ in
     wayland.enable = true;
     # Theme: use a theme from nixpkgs (must be in extraPackages so SDDM can load it)
     # Popular options: catppuccin-sddm, sddm-sugar-dark, sddm-chili-theme, elegant-sddm, sddm-astronaut
-    theme = "catppuccin-mocha-mauve";
+    theme = "catppuccin-macchiato-teal";
     extraPackages = [ sddmTheme ];
     # Optional: override theme settings (background, font, etc.)
     # settings = {

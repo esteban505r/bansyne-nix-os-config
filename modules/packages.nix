@@ -26,6 +26,7 @@
     curl          # Transfer data from URLs (scripts, APIs)
     xev           # Event monitor
     neovim        # Neo Vim Editor
+    btop          # System monitor
 
     # --- Applications ---
     google-chrome # Chromium-based browser (unfree)

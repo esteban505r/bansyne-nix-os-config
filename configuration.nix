@@ -17,6 +17,7 @@
     ./modules/audio.nix
     ./modules/bluetooth.nix
     ./modules/removable-storage.nix
+    ./modules/nvidia.nix
     ./modules/sway.nix
     ./modules/developing.nix
   ];
@@ -29,8 +30,12 @@
     enable = true;
     efiSupport = true;
     device = "nodev";  # EFI: install to ESP (e.g. /boot), not a disk device
+    # Show other installed OSes (e.g. Windows) in the boot menu
+    useOSProber = true;
     # Limit generations in the menu
     configurationLimit = 10;
+    # Resolution for graphical boot menu (bit depth required: WxHx32). In GRUB menu press 'c' then run videoinfo to see modes.
+    gfxmodeEfi = "1920x1080x32,1280x1024x32,1024x768x32,auto";
     # Themed menu (sleek: light/dark/orange/bigSur; override with pkgs.sleek-grub-theme.override { withStyle = "dark"; })
     theme = pkgs.sleek-grub-theme;
     # Optional: custom background only (if theme is null)
@@ -43,6 +48,14 @@
   # Enable flakes and nix-command
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
+  };
+
+  # Automatically remove old generations and run garbage collection (frees disk, keeps boot menu manageable)
+  # Runs weekly (Mon 03:15); keeps generations from the last 7 days. Use [ "-d" ] to keep only current.
+  nix.gc = {
+    automatic = true;
+    dates = "Mon *-*-* 03:15:00";
+    options = "--delete-older-than 7d";
   };
 
   # Run non-Nix dynamically linked binaries (e.g. node/npm from nvm)
