@@ -1,8 +1,7 @@
 # NixOS flake configuration .gitignore
 
-# Optionally ignore hardware-configuration.nix if you don't want to commit it
-# (Many people DO commit it since it's part of the system config)
-# hardware-configuration.nix
+# Ignore machine-specific hardware config (generated locally)
+hardware-configuration.nix
 
 # Nix build artifacts
 result
