@@ -46,7 +46,7 @@ Personal NixOS system configuration for **bansyne**, using a modular layout and 
 - **Boot**: EFI + GRUB, theme `sleek-grub-theme`, `configurationLimit = 10`, `gfxmodeEfi` for a higher-resolution boot menu. `useOSProber = true` so other installed OSes (e.g. Windows) appear in the menu.
 - **Nix**: flakes + nix-command enabled; unfree allowed; `programs.nix-ld.enable` for running non-Nix dynamic binaries (e.g. nvm node). **Automatic GC**: weekly timer removes generations older than 7 days (`nix.gc`).
 - **Graphics**: `hardware.graphics.enable = true` (OpenGL / libGL for IDEs and games).
-- **Specialisations**: `gaming` — adds `modules/gaming.nix`; select **“gaming”** at the GRUB menu to boot with Steam, RetroArch, Dolphin, etc.
+- **Specialisations**: `gaming` — adds `modules/gaming.nix`; in GRUB you should see **“NixOS - Gaming”** next to **“NixOS - Default”** (current generation). Older generations list specialisations inside **“NixOS - All configurations”** submenus. After `nixos-rebuild`, confirm with `grep -i Gaming /boot/grub/grub.cfg`.
 
 ---
 
@@ -123,7 +123,7 @@ Development tools (always in the main profile, not a specialisation):
 Loaded only when you boot the **“gaming”** specialisation:
 
 - **Emulators**: RetroArch, Dolphin
-- **Controllers**: joycond (Joy-Con), evdevhook2 (Cemuhook UDP)
+- **Controllers**: joycond + joycond-cemuhook (Joy-Con, Cemuhook UDP)
 - **Steam**: client + steam-run; Remote Play and dedicated server firewall opened
 - **Graphics**: 32-bit support enabled for Steam/games
 

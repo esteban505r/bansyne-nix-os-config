@@ -12,6 +12,7 @@
   imports = [
     ./hardware-configuration.nix
     ./modules/locale.nix
+    ./modules/fhs-shebangs.nix
     ./modules/users.nix
     ./modules/packages.nix
     ./modules/audio.nix

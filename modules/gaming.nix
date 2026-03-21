@@ -4,20 +4,23 @@
 { config, pkgs, ... }:
 
 {
+  # Label in GRUB for this profile (otherwise: "NixOS - (gaming - …)")
+  boot.loader.grub.configurationName = "Gaming";
+
   # Gaming packages
   environment.systemPackages = with pkgs; [
     # --- Emulators ---
     retroarch     # Multi-system emulator frontend (libretro cores)
     dolphin-emu   # GameCube and Wii emulator
 
-    # --- Controllers ---
-    joycond       # Nintendo Joy-Con driver/daemon (pairing, motion)
-    evdevhook2    # Cemuhook UDP server for gamepad/motion (Cemu, etc.)
-
     # --- Steam ---
     steam         # Steam client and store
     steam-run     # Run arbitrary programs in Steam’s runtime (libs, Proton)
   ];
+
+  # Joy-Con / Pro Controller: udev rules + joycond daemon at boot
+  services.joycond.enable = true;
+  programs."joycond-cemuhook".enable = true;
 
   # Enable Steam with proper configuration
   programs.steam = {
