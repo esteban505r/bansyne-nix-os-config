@@ -28,6 +28,20 @@ let
   '';
   # SDDM login theme (flavor: latte/frappe/macchiato/mocha; accent: blue/mauve/teal/...). Theme name must match: catppuccin-{flavor}-{accent}
   sddmTheme = pkgs.catppuccin-sddm.override { flavor = "macchiato"; accent = "teal"; };
+
+  swayWallpaperRandom = pkgs.writeShellScript "sway-wallpaper-random" ''
+    export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.sway ]}"
+    dirs=()
+    [[ -d "$HOME/wallpapers" ]] && dirs+=("$HOME/wallpapers")
+    [[ -d "$HOME/bansyne-nix-os-config/wallpapers" ]] && dirs+=("$HOME/bansyne-nix-os-config/wallpapers")
+    ((''${#dirs[@]})) || exit 0
+    IMG=$(find "''${dirs[@]}" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1)
+    [[ -n "$IMG" ]] && swaymsg output '*' bg "$IMG" fill
+  '';
+  swayWallpaperRandomDelayed = pkgs.writeShellScript "sway-wallpaper-random-delayed" ''
+    sleep 2
+    exec ${swayWallpaperRandom}
+  '';
 in
 {
   # Enable Sway with GTK wrapper features
@@ -184,10 +198,10 @@ in
     bindsym Print exec flameshot gui
   '';
 
-  # Wallpaper from /home/bansyne/bansyne-nix-os-config/wallpapers (random at startup, $mod+Shift+b to change)
+  # Wallpaper: random image from ~/wallpapers and/or ~/bansyne-nix-os-config/wallpapers (recursive; png/jpg/jpeg/webp).
   environment.etc."sway/config.d/wallpaper.conf".source = pkgs.writeText "wallpaper.conf" ''
-    exec --no-startup-id sh -c "sleep 5; IMG=$(find /home/bansyne/bansyne-nix-os-config/wallpapers -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1); [ -n \"$IMG\" ] && swaymsg output '*' bg \"$IMG\" fill"
-    bindsym $mod+Shift+b exec sh -c "IMG=$(find /home/bansyne/bansyne-nix-os-config/wallpapers -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1); [ -n \"$IMG\" ] && swaymsg output '*' bg \"$IMG\" fill"
+    exec --no-startup-id ${swayWallpaperRandomDelayed}
+    bindsym $mod+Shift+b exec ${swayWallpaperRandom}
   '';
 
   # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
