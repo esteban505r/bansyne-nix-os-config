@@ -29,18 +29,43 @@ let
   # SDDM login theme (flavor: latte/frappe/macchiato/mocha; accent: blue/mauve/teal/...). Theme name must match: catppuccin-{flavor}-{accent}
   sddmTheme = pkgs.catppuccin-sddm.override { flavor = "macchiato"; accent = "teal"; };
 
-  swayWallpaperRandom = pkgs.writeShellScript "sway-wallpaper-random" ''
-    export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.sway ]}"
+  # Absolute paths: Sway's `exec` often runs without $HOME set, so $HOME/wallpapers never matched.
+  wallpaperSearchRoots = [
+    "${config.users.users.bansyne.home}/wallpapers"
+    "${config.users.users.bansyne.home}/bansyne-nix-os-config/wallpapers"
+  ];
+  swayWallpaperRandomBin = pkgs.writeShellScriptBin "sway-wallpaper-random" ''
+    export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.findutils pkgs.sway pkgs.swaybg pkgs.procps ]}"
     dirs=()
-    [[ -d "$HOME/wallpapers" ]] && dirs+=("$HOME/wallpapers")
-    [[ -d "$HOME/bansyne-nix-os-config/wallpapers" ]] && dirs+=("$HOME/bansyne-nix-os-config/wallpapers")
-    ((''${#dirs[@]})) || exit 0
-    IMG=$(find "''${dirs[@]}" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1)
-    [[ -n "$IMG" ]] && swaymsg output '*' bg "$IMG" fill
+    ${lib.concatMapStrings (d: ''
+    [[ -d "${d}" ]] && dirs+=("${d}")
+    '') wallpaperSearchRoots}
+    if (( ''${#dirs[@]} == 0 )); then
+      echo "sway-wallpaper-random: no wallpaper directories exist" >&2
+      exit 1
+    fi
+    # -xtype f: include symlinks to images (-type f alone skips symlinks, so git-annex / links look "empty").
+    IMG=$(find -L "''${dirs[@]}" -xtype f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | shuf -n1)
+    if [[ -z "$IMG" ]]; then
+      echo "sway-wallpaper-random: no images under ''${dirs[*]}" >&2
+      exit 1
+    fi
+    # Prefer IPC: works from any terminal inside Sway (swaybg often fails or exits if Wayland env is odd).
+    if swaymsg output '*' bg "$IMG" fill 2>/dev/null; then
+      exit 0
+    fi
+    pkill -x swaybg 2>/dev/null || true
+    swaybg -i "$IMG" -m fill &
   '';
-  swayWallpaperRandomDelayed = pkgs.writeShellScript "sway-wallpaper-random-delayed" ''
-    sleep 2
-    exec ${swayWallpaperRandom}
+  # Delay + wait for Wayland socket so swaybg can connect (NVIDIA / slow init).
+  swayWallpaperRandomDelayedBin = pkgs.writeShellScriptBin "sway-wallpaper-random-delayed" ''
+    export PATH="${lib.makeBinPath [ pkgs.coreutils ]}"
+    sleep 3
+    for _ in $(seq 1 120); do
+      [ -n "$WAYLAND_DISPLAY" ] && break
+      sleep 0.05
+    done
+    exec ${swayWallpaperRandomBin}/bin/sway-wallpaper-random
   '';
 in
 {
@@ -198,10 +223,10 @@ in
     bindsym Print exec flameshot gui
   '';
 
-  # Wallpaper: random image from ~/wallpapers and/or ~/bansyne-nix-os-config/wallpapers (recursive; png/jpg/jpeg/webp).
+  # Random wallpaper via swaybg (absolute paths; Sway exec often has no $HOME).
   environment.etc."sway/config.d/wallpaper.conf".source = pkgs.writeText "wallpaper.conf" ''
-    exec --no-startup-id ${swayWallpaperRandomDelayed}
-    bindsym $mod+Shift+b exec ${swayWallpaperRandom}
+    exec --no-startup-id ${swayWallpaperRandomDelayedBin}/bin/sway-wallpaper-random-delayed
+    bindsym $mod+Shift+b exec ${swayWallpaperRandomBin}/bin/sway-wallpaper-random
   '';
 
   # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
@@ -224,6 +249,8 @@ in
     (pkgs.writeShellScriptBin "waybar" ''
       exec ${pkgs.waybar}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css "$@"
     '')
+    swayWallpaperRandomBin
+    swayWallpaperRandomDelayedBin
     sddmTheme
     pkgs.swaybg
   ];
