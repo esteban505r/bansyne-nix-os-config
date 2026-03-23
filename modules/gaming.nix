@@ -4,9 +4,6 @@
 { config, pkgs, ... }:
 
 {
-  # Label in GRUB for this profile (otherwise: "NixOS - (gaming - …)")
-  boot.loader.grub.configurationName = "Gaming";
-
   # Gaming packages
   environment.systemPackages = with pkgs; [
     # --- Emulators ---

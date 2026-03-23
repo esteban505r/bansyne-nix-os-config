@@ -1,7 +1,7 @@
 # Main NixOS configuration file
 # This file imports all modules and sets the system state version
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   # Import hardware configuration
@@ -24,27 +24,26 @@
   ];
 
 
-  # Bootloader: GRUB with theme (replaces systemd-boot for a customizable menu)
-  # Alternatives: systemd-boot = minimal, no themes; rEFInd = graphical but doesn't manage NixOS generations
+  # Bootloader: Lanzaboote (Secure Boot + signed UKIs via systemd-boot).
+  # Manual keys: sudo sbctl create-keys (if /var/lib/sbctl has no keys), rebuild, sudo sbctl verify,
+  # firmware in Setup Mode, then sudo sbctl enroll-keys --microsoft. See:
+  # https://nix-community.github.io/lanzaboote/getting-started/
+  boot.loader.grub.enable = false;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.loader.grub = {
+  boot.loader.systemd-boot.enable = lib.mkForce false;
+  boot.loader.systemd-boot.configurationLimit = 10;
+  # Prevent editing the kernel cmdline from the boot menu (Secure Boot hardening).
+  boot.loader.systemd-boot.editor = false;
+
+  boot.lanzaboote = {
     enable = true;
-    efiSupport = true;
-    device = "nodev";  # EFI: install to ESP (e.g. /boot), not a disk device
-    # Show other installed OSes (e.g. Windows) in the boot menu
-    useOSProber = true;
-    # Limit generations in the menu
-    configurationLimit = 10;
-    # Resolution for graphical boot menu (bit depth required: WxHx32). In GRUB menu press 'c' then run videoinfo to see modes.
-    gfxmodeEfi = "1920x1080x32,1280x1024x32,1024x768x32,auto";
-    # Themed menu (sleek: light/dark/orange/bigSur; override with pkgs.sleek-grub-theme.override { withStyle = "dark"; })
-    theme = pkgs.sleek-grub-theme;
-    # Optional: custom background only (if theme is null)
-    # splashImage = null;
-    # splashMode = "stretch";
-    # Font size (when using theme that supports it)
-    # fontSize = 24;
+    pkiBundle = "/var/lib/sbctl";
   };
+
+  # Windows on the same ESP as NixOS is usually picked up automatically. Separate ESP/disk:
+  # boot.loader.systemd-boot.windows.<name> + EDK2 shell handle discovery (nixpkgs systemd-boot docs).
+
+  environment.systemPackages = [ pkgs.sbctl ];
 
   # Enable flakes and nix-command
   nix.settings = {
