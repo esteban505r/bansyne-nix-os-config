@@ -43,7 +43,10 @@
   # Windows on the same ESP as NixOS is usually picked up automatically. Separate ESP/disk:
   # boot.loader.systemd-boot.windows.<name> + EDK2 shell handle discovery (nixpkgs systemd-boot docs).
 
-  environment.systemPackages = [ pkgs.sbctl ];
+  environment.systemPackages = [
+    pkgs.sbctl
+    pkgs.efibootmgr
+  ];
 
   # Enable flakes and nix-command
   nix.settings = {
