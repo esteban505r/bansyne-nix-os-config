@@ -1,8 +1,6 @@
 # NixOS flake configuration .gitignore
 
 # Ignore machine-specific hardware config (generated locally)
-hardware-configuration.nix
-
 # Nix build artifacts
 result
 result-*
