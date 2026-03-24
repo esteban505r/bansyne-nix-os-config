@@ -33,10 +33,13 @@
     git           # Version control
     wget          # Download files (HTTP/HTTPS/FTP)
     curl          # Transfer data from URLs (scripts, APIs)
+    jq            # JSON processor for scripts/automation
+    websocat      # WebSocket CLI (used by waybar-oter-daemon)
     zip           # Create .zip archives (zip, zipcloak, etc.)
     xev           # Event monitor
     neovim        # Neo Vim Editor
     btop          # System monitor
+    baobab 	  # Directory size analyzer
 
     # --- Applications ---
     google-chrome # Chromium-based browser (unfree)

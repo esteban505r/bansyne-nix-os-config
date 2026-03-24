@@ -7,3 +7,6 @@ result-*
 
 # Flake lock file (optional - some people commit it, some don't)
 # flake.lock
+
+# Oter API tokens (copy secrets/oter.env.example → secrets/oter.env; sourced by Waybar — see modules/sway.nix)
+secrets/oter.env
