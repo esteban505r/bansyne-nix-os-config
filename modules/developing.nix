@@ -66,6 +66,18 @@ let
     '';
   android-studio-wrapped = wrapJetbrains "android-studio" pkgs.android-studio "android-studio";
   idea-wrapped = wrapJetbrains "idea" pkgs.jetbrains.idea "idea";
+  # DBeaver discovers pg_dump/psql via PATH or “local client” path; nixpkgs’ wrapper does not add postgres.
+  dbeaver-wrapped = pkgs.symlinkJoin {
+    name = "dbeaver-wrapped";
+    paths = [ pkgs.dbeaver-bin ];
+    buildInputs = [ pkgs.makeWrapper ];
+    postBuild = ''
+      rm -f $out/bin/dbeaver
+      makeWrapper ${pkgs.dbeaver-bin}/bin/dbeaver $out/bin/dbeaver \
+        --prefix PATH : ${lib.makeBinPath [ pkgs.postgresql ]}
+    '';
+    meta.mainProgram = "dbeaver";
+  };
 in
 {
   # Studio runs $ANDROID_HOME/emulator/emulator by full path; child processes may not see the
@@ -97,7 +109,7 @@ in
     gcc            # C/C++ compiler (required by node-gyp)
     gradle         # Java/Kotlin build tool
     maven          # Java build and dependency management
-    dbeaver-bin    # Database management tool
+    dbeaver-wrapped # DBeaver + postgres client tools on PATH (pg_dump, psql, …)
 
     # --- Python ---
     python3              # Python interpreter
@@ -113,6 +125,10 @@ in
     fd             # Simple, fast find alternative
     bat            # Cat with syntax highlighting and paging
     eza            # Modern ls (icons, git status, tree)
+    uv             # Package manager for Node.js
+
+    # DB
+    postgresql     # PostgreSQL database server
   ];
 
   # Nix-managed JDK: installs JDK and sets JAVA_HOME (single source of truth)

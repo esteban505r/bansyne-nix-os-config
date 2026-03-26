@@ -29,6 +29,9 @@
     # --- Bluetooth ---
     blueman       # Bluetooth manager GUI (pair devices, manage connections)
 
+    # --- Audio (PipeWire exposes Pulse API; pavucontrol = sinks/sources/volumes GUI) ---
+    pavucontrol
+
     # --- System utilities ---
     git           # Version control
     wget          # Download files (HTTP/HTTPS/FTP)
@@ -40,6 +43,7 @@
     neovim        # Neo Vim Editor
     btop          # System monitor
     baobab 	  # Directory size analyzer
+    
 
     # --- Applications ---
     google-chrome # Chromium-based browser (unfree)

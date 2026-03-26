@@ -19,6 +19,7 @@
     ./modules/bluetooth.nix
     ./modules/removable-storage.nix
     ./modules/nvidia.nix
+    ./modules/oter-waybar.nix
     ./modules/sway.nix
     ./modules/developing.nix
   ];
