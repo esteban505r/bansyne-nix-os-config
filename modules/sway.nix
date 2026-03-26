@@ -1,12 +1,10 @@
 # Sway window manager configuration
 # Includes XDG portal configuration for Wayland applications
+# Oter → Waybar (daemon, env wrapper, custom modules) lives in modules/oter-waybar.nix (imported before this file).
 
 { config, pkgs, lib, ... }:
 
 let
-  # Gitignored file: secrets/oter.env (see secrets/oter.env.example). Sourced by the Waybar wrapper so custom modules inherit OTTER_*.
-  oterEnvFile = "${config.users.users.bansyne.home}/bansyne-nix-os-config/secrets/oter.env";
-
   # Default Sway config with the built-in bar block removed (Waybar is our only bar).
   # Must append include so config.d (nixos.conf, waybar-reload, etc.) is loaded.
   swayConfigWithoutBar = pkgs.runCommand "sway-config-no-bar" { } ''
@@ -71,328 +69,30 @@ let
     exec ${swayWallpaperRandomBin}/bin/sway-wallpaper-random
   '';
 
-  # Oter → Waybar: WebSocket (timers/notifications) drives refreshes; merged JSON matches prior two-module content.
-  oterWaybarSignal = 8;
-
-  oterWaybarMergeJq = pkgs.writeText "waybar-oter-merge.jq" ''
-    def dt:
-      if ($dash | type) == "object" then $dash else {} end;
-    def safe_lists:
-      if ($lists | type) == "array" then $lists else [] end;
-
-    def active_timer:
-      [ safe_lists[] | .timers[]?
-        | select((.enabled // true) == true)
-        | select(.state == "RUNNING" or .state == "PAUSED") ]
-      | sort_by(if .state == "RUNNING" then 0 else 1 end)
-      | .[0];
-
-    def mmss:
-      (. / 60 | floor | tostring) + ":"
-      + (. % 60 | if . < 10 then "0" + (. | tostring) else (. | tostring) end);
-
-    def task_title:
-      if (dt.nextTask | type) == "object" and (dt.nextTask != null) then (dt.nextTask.name // "—")
-      else "—" end;
-
-    def habit_title:
-      if (dt.nextHabit | type) == "object" and (dt.nextHabit != null) then (dt.nextHabit.name // "—")
-      else "—" end;
-
-    def timer_line:
-      if active_timer == null then "⏱ —"
-      else
-        (if active_timer.state == "PAUSED" then "⏸ " else "▶ " end)
-        + (active_timer.name // "Timer")
-        + " "
-        + ((active_timer.remainingSeconds // 0) | mmss)
-      end;
-
-    def card_sev:
-      if . == "bad" then 2 elif . == "medium" then 1 else 0 end;
-    def worst_cards:
-      ([(dt.tasksCardStatus // "medium") | card_sev, (dt.habitsCardStatus // "medium") | card_sev] | max);
-    def overdue_sev:
-      if ((dt.overdueTasks // 0) > 0) or ((dt.overdueHabits // 0) > 0) then 1 else 0 end;
-    def worst:
-      ([worst_cards, overdue_sev] | max);
-
-    def state_label:
-      if worst >= 2 then "state: catch up"
-      elif worst >= 1 then "state: balance"
-      else "state: on track" end;
-
-    def tooltip_body:
-      (
-        "Next task: " + task_title + "\n"
-        + "Next habit: " + habit_title + "\n"
-        + "Tasks overdue: \(dt.overdueTasks // 0) · Habits overdue: \(dt.overdueHabits // 0)\n"
-        + "Tasks card: \(dt.tasksCardStatus // "?") · Habits card: \(dt.habitsCardStatus // "?")"
-      );
-
-    {
-      text: (timer_line + " · T: " + task_title + " · H: " + habit_title + " · " + state_label),
-      tooltip: tooltip_body,
-      class: (if worst >= 2 then "oter-bad" elif worst >= 1 then "oter-medium" else "oter-good" end)
-    }
-  '';
-
-  # Poll fallback for Waybar if daemon has not written state yet (must match signal number below).
-  oterWaybarAuthBash = ''
-    BASE="''${OTTER_BASE_URL:-http://127.0.0.1:8080}"
-    TOKEN="''${OTTER_API_TOKEN:-}"
-    if [[ -z "''${TOKEN}" && -n "''${HOME:-}" && -f "''${HOME}/.config/oter/api_token" ]]; then
-      TOKEN="$(tr -d '\n' < "''${HOME}/.config/oter/api_token" || true)"
-    fi
-    if [[ -z "''${TOKEN}" ]]; then
-      jq -nc '{text:"Oter: no token",tooltip:"Set OTTER_API_TOKEN, secrets/oter.env, or ~/.config/oter/api_token",class:"oter-error"}'
-      exit 0
-    fi
-    AUTH=( -H "Authorization: Bearer ''${TOKEN}" -H "X-Platform: DESKTOP" )
-  '';
-
-  oterWaybarPollBin = pkgs.writeShellScriptBin "waybar-oter-poll" ''
+  notificationSoundListenerBin = pkgs.writeShellScriptBin "notification-sound-listener" ''
     set -euo pipefail
-    export PATH="${lib.makeBinPath [ pkgs.curl pkgs.jq pkgs.coreutils ]}"
-    ${oterWaybarAuthBash}
-    DT="$(date +%d/%m/%Y\ %H:%M)"
-    DASH="$(curl -sfS -G "$BASE/api/v1/dashboard" "''${AUTH[@]}" --data-urlencode "dateTime=$DT" 2>/dev/null | jq -c . 2>/dev/null || true)"
-    LISTS="$(curl -sfS "$BASE/api/v1/timers/lists" "''${AUTH[@]}" 2>/dev/null | jq -c . 2>/dev/null || true)"
-    [[ -z "''${DASH}" || "''${DASH}" == "null" ]] && DASH='{}'
-    [[ -z "''${LISTS}" ]] && LISTS='[]'
-    exec jq -nc --argjson dash "''${DASH}" --argjson lists "''${LISTS}" -f ${oterWaybarMergeJq}
-  '';
+    export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.gawk pkgs.dbus pkgs.pipewire pkgs.libcanberra-gtk3 ]}"
 
-  oterWaybarStateCatBin = pkgs.writeShellScriptBin "waybar-oter-from-state" ''
-    set -euo pipefail
-    export PATH="${lib.makeBinPath [ pkgs.jq pkgs.coreutils ]}"
-    STATE="''${OTTER_WAYBAR_STATE_FILE:-''${XDG_RUNTIME_DIR:-/tmp}/oter-waybar-state.json}"
-    if [[ -f "''${STATE}" ]]; then
-      exec cat "''${STATE}"
-    fi
-    exec jq -nc '{text:"Oter: waiting for daemon",tooltip:"waybar-oter-daemon should start from Sway; check logs / token",class:"oter-error"}'
-  '';
+    # Prefer PipeWire's pw-play (direct file playback) for reliability.
+    # Fall back to canberra-gtk-play (event sound) if pw-play isn't available.
+    SOUND_FILE="${pkgs.sound-theme-freedesktop}/share/sounds/freedesktop/stereo/message-new-instant.oga"
 
-  oterWaybarDaemonBin = pkgs.writeShellScriptBin "waybar-oter-daemon" ''
-    set -euo pipefail
-    export PATH="${lib.makeBinPath [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.websocat pkgs.procps ]}"
-
-    if [[ -r "${oterEnvFile}" ]]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "${oterEnvFile}"
-      set +a
-    fi
-
-    BASE="''${OTTER_BASE_URL:-http://127.0.0.1:8080}"
-    TOKEN="''${OTTER_API_TOKEN:-}"
-    [[ -z "''${TOKEN}" && -n "''${HOME:-}" && -f "''${HOME}/.config/oter/api_token" ]] \
-      && TOKEN="$(tr -d '\n' < "''${HOME}/.config/oter/api_token" || true)"
-
-    if [[ -z "''${TOKEN}" ]]; then
-      echo "waybar-oter-daemon: set OTTER_API_TOKEN, ${oterEnvFile}, or ~/.config/oter/api_token" >&2
-      exit 1
-    fi
-
-    SIG="''${WAYBAR_SIGNAL:-${toString oterWaybarSignal}}"
-    STATE_FILE="''${OTTER_WAYBAR_STATE_FILE:-''${XDG_RUNTIME_DIR:-/tmp}/oter-waybar-state.json}"
-    DASH_CACHE="''${OTTER_WAYBAR_DASH_CACHE:-''${STATE_FILE%.json}.dashboard.json}"
-    TIMER_MS="''${OTTER_WAYBAR_TIMER_REFRESH_MS:-1000}"
-    TIMER_SEC=$((TIMER_MS / 1000))
-    (( TIMER_SEC < 1 )) && TIMER_SEC=1
-    DEBUG="''${OTTER_WAYBAR_DEBUG:-0}"
-    LOG_FILE="''${OTTER_WAYBAR_LOG_FILE:-''${XDG_RUNTIME_DIR:-/tmp}/oter-waybar-daemon.log}"
-    PERIODIC_FULL_REFRESH_SEC="''${OTTER_WAYBAR_PERIODIC_FULL_REFRESH_SEC:-60}"
-    VERBOSE_HTTP="''${OTTER_WAYBAR_VERBOSE_HTTP:-0}"
-    TRACE_WS_RAW="''${OTTER_WAYBAR_TRACE_WS_RAW:-0}"
-    TRACE_STATE_PREVIEW="''${OTTER_WAYBAR_TRACE_STATE_PREVIEW:-0}"
-
-    debug_log() {
-      [[ "''${DEBUG}" == "1" ]] || return 0
-      printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "''${LOG_FILE}"
-    }
-
-    trap 'ec=$?; debug_log "fatal: exit_code=''${ec} line=''${LINENO} cmd=$(printf %q "$BASH_COMMAND")"' ERR
-    trap 'debug_log "daemon_exit: code=$?"' EXIT
-
-    derive_ws_base() {
-      local b="$1"
-      if [[ "$b" == https://* ]]; then
-        echo "wss://''${b#https://}"
+    play_sound() {
+      if command -v pw-play >/dev/null 2>&1; then
+        pw-play "$SOUND_FILE" >/dev/null 2>&1 &
       else
-        echo "ws://''${b#http://}"
+        canberra-gtk-play -i message-new-instant >/dev/null 2>&1 &
       fi
     }
 
-    WS_BASE="''${OTTER_WS_URL:-$(derive_ws_base "$BASE")}"
-    WS_URL="''${WS_BASE%/}/api/v1/timers/notifications"
-
-    AUTH=( -H "Authorization: Bearer ''${TOKEN}" -H "X-Platform: DESKTOP" )
-
-    dash_is_ok() {
-      echo "$1" | jq -e 'type == "object" and (.error | type) != "string"' >/dev/null 2>&1
-    }
-
-    merge_to_waybar() {
-      local dash_json="$1"
-      local lists_json="$2"
-      local merged
-      merged="$(jq -nc --argjson dash "$dash_json" --argjson lists "$lists_json" -f ${oterWaybarMergeJq})"
-      if [[ "''${TRACE_STATE_PREVIEW}" == "1" ]]; then
-        debug_log "state_preview: $(echo "$merged" | jq -c . 2>/dev/null || echo '<invalid-json>')"
-      fi
-      printf '%s' "$merged" >"''${STATE_FILE}.tmp" && mv "''${STATE_FILE}.tmp" "''${STATE_FILE}"
-      debug_log "merge_to_waybar: state_bytes=$(wc -c < "''${STATE_FILE}" 2>/dev/null || echo 0)"
-      pkill "-RTMIN+''${SIG}" waybar 2>/dev/null || true
-      debug_log "merge_to_waybar: state_file=''${STATE_FILE} signal=''${SIG}"
-    }
-
-    fetch_json() {
-      # Usage: fetch_json OUT_VAR URL [curl args...]
-      local __out_var="$1"; shift
-      local __url="$1"; shift
-      local __tmp_body __tmp_code __code __body
-      __tmp_body="$(mktemp)"
-      __tmp_code="$(mktemp)"
-      curl -sS -w '%{http_code}' -o "$__tmp_body" "$__url" "$@" >"$__tmp_code" 2>>"''${LOG_FILE}" || true
-      __code="$(cat "$__tmp_code" 2>/dev/null || echo "000")"
-      __body="$(cat "$__tmp_body" 2>/dev/null || echo "{}")"
-      rm -f "$__tmp_body" "$__tmp_code"
-      if [[ "''${VERBOSE_HTTP}" == "1" || "''${DEBUG}" == "1" ]]; then
-        debug_log "http: url=''${__url} code=''${__code} bytes=''${#__body}"
-      fi
-      if [[ "$__code" =~ ^2[0-9][0-9]$ ]]; then
-        printf -v "$__out_var" '%s' "$__body"
-      else
-        if [[ "''${VERBOSE_HTTP}" == "1" || "''${DEBUG}" == "1" ]]; then
-          debug_log "http_non_2xx: url=''${__url} code=''${__code} body=$(echo "$__body" | jq -c . 2>/dev/null || echo "$__body" | tr '\n' ' ')"
-        fi
-        printf -v "$__out_var" '%s' '{"error":"network"}'
-      fi
-    }
-
-    write_state_full() {
-      local DT DASH LISTS
-      DT="$(date +%d/%m/%Y\ %H:%M)"
-      debug_log "write_state_full: dateTime=''${DT}"
-      fetch_json DASH "$BASE/api/v1/dashboard" "''${AUTH[@]}" -G --data-urlencode "dateTime=$DT"
-      fetch_json LISTS "$BASE/api/v1/timers/lists" "''${AUTH[@]}"
-      [[ -z "$LISTS" || "$LISTS" == '{"error":"network"}' ]] && LISTS='[]'
-
-      if dash_is_ok "$DASH"; then
-        debug_log "write_state_full: dashboard=ok"
-        printf '%s' "''${DASH}" >"''${DASH_CACHE}.tmp" && mv "''${DASH_CACHE}.tmp" "''${DASH_CACHE}"
-        merge_to_waybar "$DASH" "$LISTS"
-      else
-        debug_log "write_state_full: dashboard=error payload=$(echo "''${DASH}" | jq -c . 2>/dev/null || echo '<invalid-json>')"
-        echo "waybar-oter-daemon: dashboard request failed or API error; keeping cache if any" >&2
-        if [[ -f "''${DASH_CACHE}" ]]; then
-          local CACHED
-          CACHED="$(cat "''${DASH_CACHE}")"
-          debug_log "write_state_full: using cached dashboard"
-          merge_to_waybar "$CACHED" "''${LISTS}"
-        else
-          jq -nc \
-            --arg err "$(echo "''${DASH}" | jq -r '.message // .error // "dashboard error"')" \
-            '{text: ("Oter: " + $err), tooltip: $err, class: "oter-error"}' \
-            >"''${STATE_FILE}.tmp" && mv "''${STATE_FILE}.tmp" "''${STATE_FILE}"
-          pkill "-RTMIN+''${SIG}" waybar 2>/dev/null || true
-          debug_log "write_state_full: no cache available; wrote oter-error state"
-        fi
-      fi
-    }
-
-    write_state_lists_only() {
-      local LISTS CACHED
-      debug_log "write_state_lists_only"
-      fetch_json LISTS "$BASE/api/v1/timers/lists" "''${AUTH[@]}"
-      [[ -z "$LISTS" || "$LISTS" == '{"error":"network"}' ]] && LISTS='[]'
-      if [[ ! -f "''${DASH_CACHE}" ]]; then
-        debug_log "write_state_lists_only: missing dashboard cache -> full refresh"
-        write_state_full
-        return
-      fi
-      CACHED="$(cat "''${DASH_CACHE}")"
-      merge_to_waybar "$CACHED" "''${LISTS}"
-    }
-
-    write_state_full
-
-    last_lists_fetch=0
-    last_full_fetch="$(date +%s)"
-    debug_log "daemon_start: base=''${BASE} ws_url=''${WS_URL} state_file=''${STATE_FILE} timer_sec=''${TIMER_SEC} periodic_full_refresh_sec=''${PERIODIC_FULL_REFRESH_SEC}"
-    while true; do
-      debug_log "ws_connect: opening ''${WS_URL}"
-      coproc WS { websocat -n -t -H="Authorization: Bearer ''${TOKEN}" "''${WS_URL}" 2>>"''${LOG_FILE}"; }
-      ws_pid="''${WS_PID}"
-      debug_log "ws_connect: started websocat pid=''${ws_pid}"
-      ws_last_idle_log="$(date +%s)"
-      while true; do
-        if IFS= read -r -t 1 -u "''${WS[0]}" line; then
-          [[ "''${TRACE_WS_RAW}" == "1" ]] && debug_log "ws_raw: ''${line}"
-          type="$(echo "$line" | jq -r '.type // empty' 2>/dev/null || true)"
-          debug_log "ws_event: type=''${type:-<none>} payload=$(echo "$line" | jq -c . 2>/dev/null || echo '<invalid-json>')"
-          case "$type" in
-            AgendaRefresh)
-              write_state_full
-              last_full_fetch="$(date +%s)"
-              ;;
-            TimerUpdate|TimerListUpdate|TimerListRefresh)
-              now_s="$(date +%s)"
-              if (( now_s - last_lists_fetch >= TIMER_SEC )); then
-                last_lists_fetch=$now_s
-                write_state_lists_only
-              else
-                debug_log "ws_event: throttled lists-only refresh"
-              fi
-              ;;
-            *)
-              debug_log "ws_event: ignored event type='${type:-unknown}'"
-              ;;
-          esac
-        else
-          now_s="$(date +%s)"
-          if (( PERIODIC_FULL_REFRESH_SEC > 0 && now_s - last_full_fetch >= PERIODIC_FULL_REFRESH_SEC )); then
-            debug_log "periodic_full_refresh: trigger"
-            write_state_full
-            last_full_fetch=$now_s
-          fi
-          if (( now_s - ws_last_idle_log >= 30 )); then
-            debug_log "ws_idle: no messages for 30s (pid=''${ws_pid})"
-            ws_last_idle_log=$now_s
-          fi
-          if ! kill -0 "''${ws_pid}" 2>/dev/null; then
-            wait "''${ws_pid}" || ws_ec=$?
-            ws_ec="''${ws_ec:-0}"
-            debug_log "ws_process_exit: pid=''${ws_pid} exit_code=''${ws_ec}"
-            break
-          fi
-        fi
-      done
-      exec {WS[0]}<&- 2>/dev/null || true
-      debug_log "ws_disconnect: reconnecting in 2s"
-      sleep 2
-    done
-  '';
-
-  # Keep Oter daemon alive; useful when websocket/auth intermittently drops.
-  oterWaybarDaemonRunBin = pkgs.writeShellScriptBin "waybar-oter-daemon-run" ''
-    set -euo pipefail
-    export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.procps pkgs.bash ]}"
-
-    if [[ -r "${oterEnvFile}" ]]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "${oterEnvFile}"
-      set +a
-    fi
-
-    LOG_FILE="''${OTTER_WAYBAR_LOG_FILE:-''${XDG_RUNTIME_DIR:-/tmp}/oter-waybar-daemon.log}"
-    while true; do
-      ${oterWaybarDaemonBin}/bin/waybar-oter-daemon >>"''${LOG_FILE}" 2>&1 || true
-      printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "daemon_runner: daemon exited; restarting in 2s" >> "''${LOG_FILE}"
-      sleep 2
-    done
+    # Play a default sound whenever a notification is posted via the standard D-Bus API.
+    # This covers "silent" notifications where the app doesn't play its own sound.
+    exec dbus-monitor --session "interface='org.freedesktop.Notifications',member='Notify'" 2>/dev/null \
+      | awk '
+          /member=Notify/ {
+            system("'"'"'sh -lc play_sound'"'"'")
+          }
+        '
   '';
 in
 {
@@ -421,17 +121,65 @@ in
     {
       "layer": "top",
       "position": "bottom",
-      "height": 28,
-      "modules-left": ["sway/workspaces", "sway/window", "custom/oter"],
+      "height": 34,
+      "fixed-center": true,
+      "modules-left": [
+        "sway/workspaces",
+        "custom/oter_timer",
+        "custom/oter_task",
+        "custom/oter_habit",
+        "custom/oter_state",
+        "sway/window"
+      ],
       "modules-center": ["cpu", "memory", "disk"],
-      "modules-right": ["pulseaudio", "backlight", "keyboard", "network", "battery", "tray", "clock"],
-      "custom/oter": {
+      "modules-right": [
+        "pulseaudio",
+        "backlight",
+        "sway/language",
+        "network",
+        "battery",
+        "tray",
+        "clock"
+      ],
+      "custom/oter_timer": {
         "format": "{}",
         "return-type": "json",
-        "exec": "${oterWaybarStateCatBin}/bin/waybar-oter-from-state",
-        "interval": 120,
-        "signal": ${toString oterWaybarSignal},
-        "tooltip": true
+        "exec": "${config.custom.otter.waybar.sliceBin}/bin/waybar-oter-slice timer",
+        "interval": 2,
+        "signal": ${toString config.custom.otter.waybar.signal},
+        "tooltip": true,
+        "min-length": 20,
+        "max-length": 96
+      },
+      "custom/oter_task": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "${config.custom.otter.waybar.sliceBin}/bin/waybar-oter-slice task",
+        "interval": 2,
+        "signal": ${toString config.custom.otter.waybar.signal},
+        "tooltip": true,
+        "min-length": 24,
+        "max-length": 140
+      },
+      "custom/oter_habit": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "${config.custom.otter.waybar.sliceBin}/bin/waybar-oter-slice habit",
+        "interval": 2,
+        "signal": ${toString config.custom.otter.waybar.signal},
+        "tooltip": true,
+        "min-length": 24,
+        "max-length": 140
+      },
+      "custom/oter_state": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "${config.custom.otter.waybar.sliceBin}/bin/waybar-oter-slice state",
+        "interval": 2,
+        "signal": ${toString config.custom.otter.waybar.signal},
+        "tooltip": true,
+        "min-length": 18,
+        "max-length": 80
       },
       "sway/workspaces": {
         "format": "{name}",
@@ -441,24 +189,27 @@ in
           "urgent": "&#x26A0;"
         }
       },
+      "sway/window": {
+        "max-length": 24
+      },
       "cpu": {
-        "format": "&#x2699; CPU {usage}% load {load}",
-        "tooltip-format": "CPU: {usage}% usage, load avg {load}",
+        "format": "&#x2699; {usage}%",
+        "tooltip-format": "CPU: {usage}% · load {load}",
         "interval": 2
       },
       "memory": {
-        "format": "&#x1F4BE; MEM {used:0.1f}G/{total:0.1f}G ({percentage}%)",
-        "tooltip-format": "RAM: {used:0.2f}G used, {avail:0.2f}G avail of {total:0.2f}G",
+        "format": "&#x1F4BE; {percentage}%",
+        "tooltip-format": "RAM: {used:0.2f}GiB / {total:0.2f}GiB ({percentage}%) · {avail:0.2f}GiB avail",
         "interval": 2
       },
       "disk": {
-        "format": "&#x1F4BF; DISK {used:0.1f}G/{total:0.1f}G ({percentage_used}%)",
+        "format": "&#x1F4BF; {percentage_used}%",
         "path": "/",
-        "tooltip-format": "{path}: {used:0.2f}G used, {free:0.2f}G free of {total:0.2f}G",
+        "tooltip-format": "{path}: {used} used, {free} free of {total} ({percentage_used}%)",
         "interval": 30
       },
       "pulseaudio": {
-        "format": "{icon} VOL {volume}%",
+        "format": "{icon} {volume}%",
         "format-muted": "&#x1F507; VOL muted",
         "format-icons": {
           "default": ["&#x1F508;", "&#x1F509;", "&#x1F50A;"],
@@ -470,30 +221,36 @@ in
         "format": "{icon} BRIGHT {percent}%",
         "format-icons": ["&#x1F505;", "&#x1F505;", "&#x2600;", "&#x2600;", "&#x2600;"]
       },
-      "keyboard": {
-        "format": "&#x2328; KB {layout}",
-        "tooltip-format": "Layout: {layout}"
+      "sway/language": {
+        "format": "&#x2328; KB {short}",
+        "tooltip-format": "Layout: {long}"
       },
       "network": {
-        "format-wifi": "&#x1F4F6; WIFI {signalStrength}%",
-        "format-ethernet": "&#x1F310; ETH connected",
-        "format-disconnected": "&#x26A0; NET disconnected",
+        "format-wifi": "&#x1F4F6; {signalStrength}%",
+        "format-ethernet": "&#x1F310; ETH",
+        "format-disconnected": "&#x26A0; —",
         "tooltip-format": "{ifname}: {ipaddr}"
       },
       "battery": {
-        "format": "{icon} BAT {capacity}%",
-        "format-charging": "&#x26A1; BAT {capacity}%",
-        "format-plugged": "&#x1F50C; BAT {capacity}%",
+        "format": "{icon} {capacity}%",
+        "format-charging": "&#x26A1; {capacity}%",
+        "format-plugged": "&#x1F50C; {capacity}%",
         "format-icons": ["&#x1F50B;", "&#x1F50B;", "&#x1F50B;", "&#x1F50B;", "&#x1F50B;"],
         "interval": 10
       },
       "tray": {
         "icon-size": 18,
-        "spacing": 6
+        "spacing": 6,
+        "show-passive-items": false,
+        "icons": {
+          "": "image-missing",
+          "flameshot": "${pkgs.flameshot}/share/icons/hicolor/48x48/apps/flameshot.png",
+          "org.flameshot.Flameshot": "${pkgs.flameshot}/share/icons/hicolor/48x48/apps/org.flameshot.Flameshot.png"
+        }
       },
       "clock": {
-        "format": "&#x1F550; {:%H:%M %d/%m}",
-        "tooltip-format": "<big>{:%A %d %B %Y}</big>\n<tt><small>{:%H:%M}</small></tt>"
+        "format": "🕐 {:%H:%M}",
+        "tooltip-format": "{:%A %e %B %Y · %H:%M}"
       }
     }
   '';
@@ -529,31 +286,69 @@ in
       font-weight: 500;
     }
     #cpu, #memory, #disk {
-      padding: 0 10px;
+      padding: 0 8px;
       margin: 0 2px;
+      font-size: 12px;
+      opacity: 0.88;
     }
-    #pulseaudio, #backlight, #keyboard, #network, #battery, #clock {
-      padding: 0 10px;
+    #pulseaudio, #backlight, #language, #network, #battery, #clock {
+      padding: 0 8px;
       margin: 0 2px;
+      font-size: 12px;
+      opacity: 0.9;
     }
     #tray {
       padding: 0 8px;
     }
-    #custom-oter {
-      padding: 0 10px;
-      margin: 0 2px;
+    #custom-oter_timer,
+    #custom-oter_task,
+    #custom-oter_habit,
+    #custom-oter_state {
+      padding: 4px 12px;
+      margin: 0 5px 0 0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: #0c0a09;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(0, 0, 0, 0.14);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
     }
-    #custom-oter.oter-medium {
-      opacity: 0.9;
+    #custom-oter_timer {
+      margin-left: 6px;
     }
-    #custom-oter.oter-bad {
+    #custom-oter_timer.oter-medium,
+    #custom-oter_task.oter-medium,
+    #custom-oter_habit.oter-medium,
+    #custom-oter_state.oter-medium {
+      color: #292524;
+      background: rgba(255, 253, 250, 0.9);
+      border-color: rgba(120, 53, 15, 0.25);
+    }
+    #custom-oter_timer.oter-bad,
+    #custom-oter_task.oter-bad,
+    #custom-oter_habit.oter-bad,
+    #custom-oter_state.oter-bad {
       font-weight: 700;
+      color: #450a0a;
+      background: rgba(254, 226, 226, 0.95);
+      border-color: rgba(185, 28, 28, 0.35);
     }
-    #custom-oter.oter-error {
-      font-style: italic;
+    #custom-oter_timer.oter-error,
+    #custom-oter_task.oter-error,
+    #custom-oter_habit.oter-error,
+    #custom-oter_state.oter-error {
+      font-weight: 600;
+      font-style: normal;
+      color: #431407;
+      background: rgba(255, 237, 213, 0.96);
+      border-color: rgba(194, 65, 12, 0.35);
     }
     #clock {
       font-weight: bold;
+      font-size: 13px;
+      opacity: 1;
     }
   '';
 
@@ -577,43 +372,110 @@ in
     bindsym $mod+Shift+b exec ${swayWallpaperRandomBin}/bin/sway-wallpaper-random
   '';
 
-  # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
-  # pgrep/pkill -x waybar is wrong here: PATH waybar is a shell script, so comm is often "bash" until exec;
-  # reload would not kill/reap correctly and Super+Shift+w stacked multiple bars. Match argv (-c path) instead.
-  environment.etc."sway/config.d/waybar-reload.conf".source = pkgs.writeText "waybar-reload.conf" ''
-    exec --no-startup-id sh -c 'pgrep -f waybar-oter-daemon-run >/dev/null || waybar-oter-daemon-run &'
-    exec --no-startup-id sh -c "pgrep -f '[w]aybar -c /etc/waybar/config' >/dev/null || exec waybar"
-    bindsym $mod+Shift+w exec sh -c "pkill -f '[w]aybar-oter-daemon-run' 2>/dev/null; pkill -f '[w]aybar-oter-daemon' 2>/dev/null; waybar-oter-daemon-run & pkill -f '[w]aybar -c /etc/waybar/config' 2>/dev/null; while pgrep -f '[w]aybar -c /etc/waybar/config' >/dev/null; do sleep 0.1; done; exec waybar"
+  # Notifications: SwayNotificationCenter (swaync) + keybinds
+  environment.etc."sway/config.d/notifications.conf".source = pkgs.writeText "notifications.conf" ''
+    # Start notification daemon + panel
+    exec_always --no-startup-id swaync
+
+    # Default notification sound (even for silent notifications)
+    exec_always --no-startup-id ${notificationSoundListenerBin}/bin/notification-sound-listener
+
+    # Toggle the notification panel / clear notifications
+    bindsym $mod+Shift+n exec swaync-client -t
+    bindsym $mod+Control+n exec swaync-client -C
   '';
 
-  # Waybar systemd service: custom ExecStart; do NOT auto-start (Sway runs waybar via exec to avoid two bars). Restart with Super+Shift+w.
-  systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
-  systemd.user.services.waybar.unitConfig = {
-    PartOf = [ "sway-session.target" ];
-    After = [ "sway-session.target" ];
-  };
-  systemd.user.services.waybar.serviceConfig.ExecStart = [
-    "" # clear default
-    "${config.programs.waybar.package}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css"
-  ];
+  # System-wide defaults for SwayNotificationCenter (XDG config path)
+  environment.etc."xdg/swaync/config.json".source = pkgs.writeText "swaync-config.json" ''
+    {
+      "positionX": "right",
+      "positionY": "top",
+      "layer": "overlay",
+      "control-center-margin-top": 10,
+      "control-center-margin-bottom": 10,
+      "control-center-margin-right": 10,
+      "control-center-margin-left": 10,
+      "control-center-width": 420,
+      "control-center-height": 900,
+      "notification-2fa-action": true,
+      "notification-window-width": 420,
+      "notification-icon-size": 52,
+      "notification-body-image-height": 120,
+      "notification-body-image-width": 240,
+      "timeout": 7,
+      "timeout-low": 4,
+      "timeout-critical": 0,
+      "fit-to-screen": true,
+      "keyboard-shortcuts": true,
+      "image-visibility": "when-available",
+      "transition-time": 120,
+      "hide-on-clear": true,
+      "hide-on-action": true
+    }
+  '';
+  environment.etc."xdg/swaync/style.css".source = pkgs.writeText "swaync-style.css" ''
+    * {
+      font-family: sans-serif;
+      font-size: 13px;
+    }
+
+    /* Notification popups */
+    .notification-row {
+      margin: 8px;
+    }
+    .notification {
+      border-radius: 14px;
+      padding: 10px;
+      background: rgba(17, 17, 17, 0.92);
+      color: #f5f5f5;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    }
+    .notification.critical {
+      border: 1px solid rgba(248, 113, 113, 0.7);
+      background: rgba(69, 10, 10, 0.92);
+    }
+    .summary {
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .body {
+      opacity: 0.92;
+    }
+    .time {
+      opacity: 0.7;
+    }
+
+    /* Control center panel */
+    .control-center {
+      border-radius: 18px;
+      background: rgba(10, 10, 10, 0.92);
+      color: #fafafa;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+      padding: 10px;
+    }
+    .control-center .widget-title {
+      font-weight: 800;
+      font-size: 14px;
+      margin: 8px 8px 6px 8px;
+    }
+    .control-center .widget-label {
+      opacity: 0.85;
+    }
+  '';
+
+  # Waybar autostart / Super+Shift+w restart + systemd overrides: modules/oter-waybar.nix
+
   environment.systemPackages = [
-    (pkgs.writeShellScriptBin "waybar" ''
-      if [[ -r "${oterEnvFile}" ]]; then
-        set -a
-        # shellcheck disable=SC1090
-        source "${oterEnvFile}"
-        set +a
-      fi
-      exec ${pkgs.waybar}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css "$@"
-    '')
     swayWallpaperRandomBin
     swayWallpaperRandomDelayedBin
-    oterWaybarDaemonRunBin
-    oterWaybarDaemonBin
-    oterWaybarStateCatBin
-    oterWaybarPollBin
     sddmTheme
     pkgs.swaybg
+    pkgs.swaynotificationcenter
+    pkgs.libnotify
+    pkgs.libcanberra-gtk3
+    pkgs.sound-theme-freedesktop
   ];
 
   # Enable XDG portals for Wayland applications
@@ -653,4 +515,7 @@ in
     enable = true;
     settings.default = [ "Alacritty.desktop" ];
   };
+
+  # Default file manager for folders (file pickers, "Open folder", etc.)
+  xdg.mime.defaultApplications."inode/directory" = "thunar.desktop";
 }

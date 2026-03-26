@@ -2,13 +2,40 @@
 
 { config, pkgs, lib, ... }:
 
+let
+  home = config.users.users.bansyne.home;
+  # Sway / bemenu do not load interactiveShellInit; login profile + .desktop cover PATH and XDG menus.
+  oterPathInit = ''
+    if [ -d "$HOME/Programs/Oter/bin" ]; then
+      export PATH="$HOME/Programs/Oter/bin:$PATH"
+    fi
+  '';
+  oterDesktop = pkgs.writeTextDir "share/applications/oter.desktop" ''
+    [Desktop Entry]
+    Type=Application
+    Version=1.0
+    Name=Oter
+    Comment=Oter desktop application
+    Exec=${home}/Programs/Oter/bin/Oter
+    TryExec=${home}/Programs/Oter/bin/Oter
+    Terminal=false
+    Categories=Office;Productivity;
+  '';
+in
 {
+  environment.systemPackages = [ oterDesktop ];
+
+  # Login shells / some display-manager sessions: so bemenu-run sees Oter on PATH.
+  environment.extraInit = oterPathInit;
+
   # Load nvm in interactive shells.
   # Install: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
   # Silence "bash: hash: hashing disabled" (nvm uses hash; NixOS has it disabled).
   environment.interactiveShellInit = ''
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
+
+    ${oterPathInit}
 
     # Android SDK: prefer ~/Android/Sdk (Android Studio default on Linux), then ~/.android/sdk. Adds emulator, platform-tools, cmdline-tools to PATH.
     if [ -d "$HOME/Android/Sdk" ]; then export ANDROID_HOME="$HOME/Android/Sdk"
