@@ -162,6 +162,32 @@ in
       }
     }
   '';
+  # Mako: Wayland notification daemon; Catppuccin Macchiato + teal (matches SDDM catppuccin-macchiato-teal)
+  environment.etc."mako/config".source = pkgs.writeText "mako-config" ''
+    sort=-time
+    layer=overlay
+    anchor=top-right
+    width=420
+    height=120
+    margin=10
+    padding=16
+    border-size=2
+    border-radius=16
+    font=sans-serif 11
+    background-color=#24273ae6
+    text-color=#cad3f5
+    border-color=#8bd5ca
+    progress-color=#8bd5ca
+    icons=1
+    max-icon-size=48
+    markup=1
+    actions=1
+    default-timeout=8000
+    ignore-timeout=0
+    max-visible=6
+    group-by=app
+  '';
+
   # Waybar style: orange background, black text
   environment.etc."waybar/style.css".source = pkgs.writeText "waybar-style.css" ''
     * {
@@ -229,6 +255,11 @@ in
     bindsym $mod+Shift+b exec ${swayWallpaperRandomBin}/bin/sway-wallpaper-random
   '';
 
+  # Notification daemon (FreeDesktop portal); config in /etc/mako/config
+  environment.etc."sway/config.d/mako.conf".source = pkgs.writeText "mako.conf" ''
+    exec --no-startup-id sh -c 'pgrep -x mako >/dev/null || exec mako -c /etc/mako/config'
+  '';
+
   # Start Waybar from Sway only if not already running (avoids duplicate bar with systemd or other starters)
   environment.etc."sway/config.d/waybar-reload.conf".source = pkgs.writeText "waybar-reload.conf" ''
     exec --no-startup-id sh -c 'pgrep -x waybar >/dev/null || exec waybar'
@@ -246,6 +277,8 @@ in
     "${config.programs.waybar.package}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css"
   ];
   environment.systemPackages = [
+    pkgs.mako
+    pkgs.libnotify
     (pkgs.writeShellScriptBin "waybar" ''
       exec ${pkgs.waybar}/bin/waybar -c /etc/waybar/config -s /etc/waybar/style.css "$@"
     '')

@@ -18,9 +18,7 @@
     steam-run     # Run arbitrary programs in Steam’s runtime (libs, Proton)
   ];
 
-  # Joy-Con / Pro Controller: udev rules + joycond daemon at boot
-  services.joycond.enable = true;
-  programs."joycond-cemuhook".enable = true;
+  # Joy-Con: services.joycond + programs.joycond-cemuhook are enabled in configuration.nix
 
   # Enable Steam with proper configuration
   programs.steam = {

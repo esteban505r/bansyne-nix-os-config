@@ -44,5 +44,8 @@
     obsidian     # Markdown-based note-taking and knowledge base
     vlc          # Media player
     thunar       # File manager (GUI)
+    pavucontrol  # PulseAudio volume control
+    pulseaudio   # PulseAudio
+    pulseaudio-ctl # PulseAudio control
   ];
 }

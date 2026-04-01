@@ -72,6 +72,17 @@
   hardware.graphics.enable = true;
   hardware.graphics.enable32Bit = true;
 
+  # Joy-Con / Pro Controller: joycond daemon + joycond-cemuhook (DSU)
+  services.joycond.enable = true;
+  programs."joycond-cemuhook".enable = true;
+
+  # Nintendo Switch controllers on hidraw: group-readable so users in "input" can access without root
+  services.udev.extraRules = ''
+    KERNEL=="hidraw*", ATTRS{idVendor}=="057e", MODE="0660", GROUP="input"
+  '';
+
+  users.users.bansyne.extraGroups = [ "input" ];
+
   # System state version - should match your NixOS release
   system.stateVersion = "25.11";
 

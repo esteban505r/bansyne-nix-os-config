@@ -102,6 +102,7 @@ in
     # --- Python ---
     python3              # Python interpreter
     python3Packages.pip   # pip package installer
+    uv                   # Fast Python package/project manager
 
     # --- Containers ---
     docker         # Container runtime
