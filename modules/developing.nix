@@ -125,6 +125,7 @@ in
     bat            # Cat with syntax highlighting and paging
     eza            # Modern ls (icons, git status, tree)
     uv             # Package manager for Node.js
+    claude-code      # AI assistant
 
     # DB
     postgresql     # PostgreSQL database server
