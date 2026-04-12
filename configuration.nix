@@ -73,6 +73,9 @@
   hardware.graphics.enable = true;
   hardware.graphics.enable32Bit = true;
 
+  # Tailscale: tailscale/tailscale login need tailscaled (socket under /var/run/tailscale/)
+  services.tailscale.enable = true;
+
   # Joy-Con / Pro Controller: joycond daemon + joycond-cemuhook (DSU)
   services.joycond.enable = true;
   programs."joycond-cemuhook".enable = true;

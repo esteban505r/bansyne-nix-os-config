@@ -32,6 +32,9 @@
     # --- Audio (PipeWire exposes Pulse API; pavucontrol = sinks/sources/volumes GUI) ---
     pavucontrol
 
+    # --- Network ---
+    tailscale     # Mesh VPN CLI (daemon: services.tailscale in configuration.nix)
+
     # --- System utilities ---
     git           # Version control
     wget          # Download files (HTTP/HTTPS/FTP)
@@ -43,9 +46,13 @@
     neovim        # Neo Vim Editor
     btop          # System monitor
     baobab 	  # Directory size analyzer
+    anki-bin    # Flashcard software
+    unzip
+    calibre   # a📚 eBook reader
     
 
     # --- Applications ---
+    google-cloud-sdk # Google Cloud CLI (gcloud, gsutil, bq)
     google-chrome # Chromium-based browser (unfree)
     code-cursor  # Cursor IDE (unfree; available in all specialisations)
     obsidian     # Markdown-based note-taking and knowledge base
