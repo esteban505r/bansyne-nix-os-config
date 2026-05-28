@@ -19,7 +19,6 @@
     swaylock      # Screen lock for Sway
     swayidle      # Idle management (lock, dpms, etc.)
     alacritty     # Terminal
-    warp-terminal # Warp terminal (Rust-based, AI features)
     grim          # Screenshot tool for Wayland (terminal-only)
     sway-contrib.grimshot  # Screenshot helper for Sway (grim-based)
     discord       # Discord for chatting
