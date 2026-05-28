@@ -410,7 +410,8 @@ in
       "image-visibility": "when-available",
       "transition-time": 120,
       "hide-on-clear": true,
-      "hide-on-action": true
+      "hide-on-action": true,
+      "cssPriority": "user"
     }
   '';
   environment.etc."xdg/swaync/style.css".source = pkgs.writeText "swaync-style.css" ''
@@ -419,10 +420,26 @@ in
       font-size: 13px;
     }
 
+    /* Layer-shell windows span the full notification area; keep them transparent. */
+    notificationwindow,
+    .blank-window,
+    .floating-notifications {
+      background: transparent;
+      background-color: transparent;
+    }
+    .notification-content,
+    .notification-background,
+    .control-center-list {
+      background: transparent;
+    }
+
     /* Notification popups */
     .notification-row {
       margin: 8px;
+      background: transparent;
     }
+    .floating-notifications .notification,
+    .control-center .notification,
     .notification {
       border-radius: 14px;
       padding: 10px;
@@ -483,8 +500,8 @@ in
   xdg.portal = {
     enable = true;
     wlr.enable = true;
-    # Optional: Enable additional portals
-    # extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    # GTK portal: file/print dialogs and fallback; often helps apps that expect it alongside wlr
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
   };
 
   # Display manager configuration (graphical login)

@@ -13,6 +13,7 @@
     # --- Steam ---
     steam         # Steam client and store
     steam-run     # Run arbitrary programs in Steam’s runtime (libs, Proton)
+    steamcmd      # SteamCMD — headless login, app updates, dedicated servers
   ];
 
   # Joy-Con / Pro Controller: udev rules + joycond daemon at boot

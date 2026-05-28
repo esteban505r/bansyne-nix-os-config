@@ -67,6 +67,7 @@ let
   android-studio-wrapped = wrapJetbrains "android-studio" pkgs.android-studio "android-studio";
   idea-wrapped = wrapJetbrains "idea" pkgs.jetbrains.idea "idea";
   # DBeaver discovers pg_dump/psql via PATH or “local client” path; nixpkgs’ wrapper does not add postgres.
+  # Same postgresql_* as modules/packages.nix so pg_dump major matches your DB servers.
   dbeaver-wrapped = pkgs.symlinkJoin {
     name = "dbeaver-wrapped";
     paths = [ pkgs.dbeaver-bin ];
@@ -74,7 +75,10 @@ let
     postBuild = ''
       rm -f $out/bin/dbeaver
       makeWrapper ${pkgs.dbeaver-bin}/bin/dbeaver $out/bin/dbeaver \
-        --prefix PATH : ${lib.makeBinPath [ pkgs.postgresql ]}
+        --prefix PATH : ${lib.makeBinPath [ pkgs.postgresql_18 ]}
+      # Upstream .desktop Exec= points at dbeaver-bin; patch so menu launches get the same PATH.
+      sed -i "s|Exec=.*|Exec=env NO_AT_BRIDGE=1 $out/bin/dbeaver %U|" \
+        $out/share/applications/dbeaver.desktop
     '';
     meta.mainProgram = "dbeaver";
   };
@@ -83,8 +87,10 @@ in
   # Studio runs $ANDROID_HOME/emulator/emulator by full path; child processes may not see the
   # IDE wrapper's LD_LIBRARY_PATH. Export the same lib path for the whole Sway session so Qt's
   # xcb platform plugin (emulator UI) can load libxcb-cursor and friends.
+  # AWT/Compose desktop (Oter, Gradle :run) need NONREPARENTING on Sway/Wayland to avoid black gaps.
   programs.sway.extraSessionCommands = lib.mkIf config.programs.sway.enable (lib.mkAfter ''
     export LD_LIBRARY_PATH="${libPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export _JAVA_AWT_WM_NONREPARENTING=1
   '');
 
   # Development packages
@@ -105,10 +111,12 @@ in
     fvm            # Flutter Version Manager (per-project Flutter versions)
 
     # --- Build tools ---
+    go             # Go compiler and toolchain (go, gofmt)
     gnumake        # GNU Make (required by node-gyp for native npm addons)
     gcc            # C/C++ compiler (required by node-gyp)
     gradle         # Java/Kotlin build tool
     maven          # Java build and dependency management
+    openssl        # TLS/crypto toolkit (openssl CLI; headers/libs for native builds)
     dbeaver-wrapped # DBeaver + postgres client tools on PATH (pg_dump, psql, …)
 
     # --- Python ---
@@ -126,15 +134,13 @@ in
     eza            # Modern ls (icons, git status, tree)
     uv             # Package manager for Node.js
     claude-code      # AI assistant
-
-    # DB
-    postgresql     # PostgreSQL database server
+    opencode         # AI coding agent (terminal)
   ];
 
   # Nix-managed JDK: installs JDK and sets JAVA_HOME (single source of truth)
   programs.java = {
     enable = true;
-    package = pkgs.jdk21;  # OpenJDK 21 LTS; use pkgs.jdk17 or pkgs.jdk11 for older
+    package = pkgs.jdk25;  # OpenJDK 25 LTS; use pkgs.jdk17 or pkgs.jdk11 for older
   };
 
   # Note: Android Studio is installed as a package above
