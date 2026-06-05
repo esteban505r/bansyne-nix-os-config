@@ -29,9 +29,12 @@
     btop          # System monitor
 
     # --- Applications ---
+    firefox       # Browser
     google-chrome # Chromium-based browser (unfree)
-    code-cursor  # Cursor IDE (unfree; available in all specialisations)
-    obsidian     # Markdown-based note-taking and knowledge base
-    thunar       # File manager (GUI)
+    thunar        # File manager (GUI)
+    file-roller   # Archive manager (zip/rar/7z/tar)
+    p7zip         # 7z CLI
+    unrar         # RAR extraction (unfree)
+    unzip         # ZIP extraction
   ];
 }

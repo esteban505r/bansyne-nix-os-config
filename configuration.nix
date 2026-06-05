@@ -18,9 +18,9 @@
     ./modules/audio.nix
     ./modules/bluetooth.nix
     ./modules/removable-storage.nix
-    ./modules/nvidia.nix
     ./modules/sway.nix
-    ./modules/developing.nix
+    ./modules/gaming.nix
+    ./modules/multimedia.nix
   ];
 
 
@@ -74,15 +74,4 @@
 
   # System state version - should match your NixOS release
   system.stateVersion = "25.11";
-
-  # Specialisations - create different boot entries with different configurations
-  # Access specialisations at boot by selecting them from the boot menu
-  specialisation = {
-    # Gaming specialisation - includes RetroArch, Dolphin, and Steam
-    gaming.configuration = {
-      imports = [
-        ./modules/gaming.nix
-      ];
-    };
-  };
 }
