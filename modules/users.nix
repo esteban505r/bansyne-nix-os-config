@@ -4,29 +4,44 @@
 
 let
   home = config.users.users.bansyne.home;
-  # Sway / bemenu do not load interactiveShellInit; login profile + .desktop cover PATH and XDG menus.
-  oterPathInit = ''
-    if [ -d "$HOME/Programs/Oter/bin" ]; then
-      export PATH="$HOME/Programs/Oter/bin:$PATH"
+  # Resolve ~/Programs/{oter,Oter}/bin/{oter,Oter} at runtime (install layout varies).
+  oterFindBin = ''
+    find_oter_bin() {
+      local dir base bin
+      for dir in "''${HOME}/Programs/oter" "''${HOME}/Programs/Oter"; do
+        for base in oter Oter; do
+          bin="''${dir}/bin/''${base}"
+          if [[ -x "''${bin}" ]]; then
+            printf '%s\n' "''${bin}"
+            return 0
+          fi
+        done
+      done
+      return 1
+    }
+  '';
+  oterLauncher = pkgs.writeShellScriptBin "oter" ''
+    ${oterFindBin}
+    OTER_BIN="$(find_oter_bin || true)"
+    if [[ -z "''${OTER_BIN}" ]]; then
+      echo "oter: not found under ~/Programs/oter or ~/Programs/Oter (expected bin/oter or bin/Oter)" >&2
+      exit 1
     fi
+    export _JAVA_AWT_WM_NONREPARENTING=1
+    exec "''${OTER_BIN}" "$@"
   '';
-  oterDesktop = pkgs.writeTextDir "share/applications/oter.desktop" ''
-    [Desktop Entry]
-    Type=Application
-    Version=1.0
-    Name=Oter
-    Comment=Oter desktop application
-    Exec=${home}/Programs/Oter/bin/Oter
-    TryExec=${home}/Programs/Oter/bin/Oter
-    Terminal=false
-    Categories=Office;Productivity;
-  '';
+  oterDesktop = pkgs.makeDesktopItem {
+    name = "oter";
+    desktopName = "Oter";
+    comment = "Oter desktop application";
+    exec = "${oterLauncher}/bin/oter";
+    tryExec = "${home}/Programs/oter/bin/oter";
+    terminal = false;
+    categories = [ "Office" ];
+  };
 in
 {
-  environment.systemPackages = [ oterDesktop ];
-
-  # Login shells / some display-manager sessions: so bemenu-run sees Oter on PATH.
-  environment.extraInit = oterPathInit;
+  environment.systemPackages = [ oterLauncher oterDesktop ];
 
   # Load nvm in interactive shells.
   # Install: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
@@ -34,8 +49,6 @@ in
   environment.interactiveShellInit = ''
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
-
-    ${oterPathInit}
 
     # Android SDK: prefer ~/Android/Sdk (Android Studio default on Linux), then ~/.android/sdk. Adds emulator, platform-tools, cmdline-tools to PATH.
     if [ -d "$HOME/Android/Sdk" ]; then export ANDROID_HOME="$HOME/Android/Sdk"

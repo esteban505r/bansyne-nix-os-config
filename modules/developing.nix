@@ -83,8 +83,10 @@ in
   # Studio runs $ANDROID_HOME/emulator/emulator by full path; child processes may not see the
   # IDE wrapper's LD_LIBRARY_PATH. Export the same lib path for the whole Sway session so Qt's
   # xcb platform plugin (emulator UI) can load libxcb-cursor and friends.
+  # AWT/Compose desktop (Oter, Gradle :run) need NONREPARENTING on Sway/Wayland to avoid black gaps.
   programs.sway.extraSessionCommands = lib.mkIf config.programs.sway.enable (lib.mkAfter ''
     export LD_LIBRARY_PATH="${libPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export _JAVA_AWT_WM_NONREPARENTING=1
   '');
 
   # Development packages
