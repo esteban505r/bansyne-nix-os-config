@@ -21,7 +21,7 @@
     easyeffects               # Pipewire EQ / plugins
     pavucontrol               # Pulse/Pipewire mixer
     spotify                   # Spotify client (unfree)
-    helvum                    # Pipewire patchbay
+    crosspipe                 # Pipewire patchbay (replaces helvum)
 
     # --- Image / misc ---
     imv                       # Lightweight Wayland image viewer
