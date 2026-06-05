@@ -9,7 +9,7 @@
       snes9x              # SNES
       genesis-plus-gx     # Mega Drive / Genesis / Game Gear / Master System
       mgba                # GBA / GB / GBC
-      mupen64plus-next    # N64
+      mupen64plus         # N64
       beetle-psx-hw       # PS1 (hardware-rendered Mednafen)
       beetle-saturn       # Saturn
       swanstation         # PS1 (alt, DuckStation core)
