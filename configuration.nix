@@ -18,7 +18,7 @@
     ./modules/audio.nix
     ./modules/bluetooth.nix
     ./modules/removable-storage.nix
-    ./modules/sway.nix
+    ./modules/desktop.nix
     ./modules/gaming.nix
     ./modules/multimedia.nix
   ];
