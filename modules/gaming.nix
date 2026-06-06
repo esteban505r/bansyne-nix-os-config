@@ -32,21 +32,21 @@
     pcsx2           # PS2
     rpcs3           # PS3
     ppsspp          # PSP
-    duckstation     # PS1
+    # duckstation   # PS1 — currently broken in nixpkgs (shaderc versionCheck); use swanstation/beetle-psx-hw cores instead
     mgba            # GBA
-    melonDS         # DS
+    melonds         # DS
     mupen64plus     # N64
     snes9x          # SNES
     mame            # Arcade (full MAME)
     scummvm         # Adventure games (LucasArts/Sierra)
     cemu            # Wii U
-    flycast         # Dreamcast
+    # flycast       # Dreamcast — currently broken in nixpkgs (glslang/cstdint); use libretro flycast core instead
 
     # --- Game launchers / clients ---
     steam           # Steam client
     steam-run       # Run vendor binaries in Steam runtime
-    lutris          # Multi-platform game launcher (Wine, GOG, emus)
-    heroic          # Epic Games / GOG / Amazon launcher
+    lutris          # Multi-platform game launcher (Wine, GOG, Epic, emus)
+    # heroic        # Epic/GOG launcher — currently broken in nixpkgs (electron 39 patch hunk fails); Lutris covers Epic/GOG
     bottles         # Wine prefix manager
 
     # --- Controller / input tools ---
