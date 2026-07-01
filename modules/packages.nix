@@ -64,6 +64,7 @@
     code-cursor  # Cursor IDE (unfree; available in all specialisations)
     obsidian     # Markdown-based note-taking and knowledge base
     vlc          # Media player
+    kdePackages.kdenlive # Video editor (KDE; non-linear editor)
     thunar       # File manager (GUI)
     pavucontrol  # PulseAudio volume control
     pulseaudio   # PulseAudio

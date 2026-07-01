@@ -96,6 +96,39 @@
     # Gaming specialisation - includes RetroArch, Dolphin, and Steam
     gaming.configuration = {
       imports = [
+        # Work around packages that fail when built locally (no substitute on this pin).
+        ({ lib, ... }: {
+          nixpkgs.overlays = [
+            (final: prev: {
+              openldap = prev.openldap.overrideAttrs (_old: {
+                doCheck = false;
+              });
+              # Man page generation fails when xsltproc/docbook paths are broken in store.
+              ostree = prev.ostree.overrideAttrs (old: {
+                configureFlags = (old.configureFlags or [ ]) ++ [ "--disable-man" ];
+                outputs = [ "out" "dev" "installedTests" ];
+              });
+              flatpak = prev.flatpak.override {
+                withMan = false;
+                withDocbookDocs = false;
+              };
+              libblockdev = prev.libblockdev.overrideAttrs (old: {
+                outputs = [ "out" "dev" "python" ];
+                postPatch = (old.postPatch or "") + ''
+                  substituteInPlace Makefile.am --replace " docs" ""
+                '';
+              });
+              udisks = prev.udisks.overrideAttrs (old: {
+                outputs = builtins.filter (x: x != "devdoc" && x != "man") old.outputs;
+                configureFlags = (builtins.filter (f: f != "--enable-gtk-doc") (old.configureFlags or [ ])) ++ [ "--disable-gtk-doc" ];
+                postConfigure = (old.postConfigure or "") + ''
+                  printf 'all:\ninstall:\n' > doc/man/Makefile
+                  printf 'all:\ninstall:\n' > doc/Makefile
+                '';
+              });
+            })
+          ];
+        })
         ./modules/gaming.nix
       ];
     };

@@ -67,14 +67,24 @@ let
   android-studio-wrapped = wrapJetbrains "android-studio" pkgs.android-studio "android-studio";
   idea-wrapped = wrapJetbrains "idea" pkgs.jetbrains.idea "idea";
   # DBeaver discovers pg_dump/psql via PATH or “local client” path; nixpkgs’ wrapper does not add postgres.
+  # pg_dump refuses to dump from a server whose major version is newer than the client, so we stage
+  # PG 14/15/16/17 side-by-side under libexec/pg-clients and let DBeaver pick per connection:
+  #   Edit Connection → Local Client → Browse → /run/current-system/sw/libexec/pg-clients/pgNN
+  # The PATH default below picks the version used when no Local Client is set on the connection.
   dbeaver-wrapped = pkgs.symlinkJoin {
     name = "dbeaver-wrapped";
     paths = [ pkgs.dbeaver-bin ];
     buildInputs = [ pkgs.makeWrapper ];
     postBuild = ''
       rm -f $out/bin/dbeaver
+      mkdir -p $out/libexec/pg-clients
+      ln -s ${pkgs.postgresql_14} $out/libexec/pg-clients/pg14
+      ln -s ${pkgs.postgresql_15} $out/libexec/pg-clients/pg15
+      ln -s ${pkgs.postgresql_16} $out/libexec/pg-clients/pg16
+      ln -s ${pkgs.postgresql_17} $out/libexec/pg-clients/pg17
+      ln -s ${pkgs.postgresql_18} $out/libexec/pg-clients/pg18
       makeWrapper ${pkgs.dbeaver-bin}/bin/dbeaver $out/bin/dbeaver \
-        --prefix PATH : ${lib.makeBinPath [ pkgs.postgresql ]}
+        --prefix PATH : ${lib.makeBinPath [ pkgs.postgresql_18 ]}
     '';
     meta.mainProgram = "dbeaver";
   };
@@ -131,7 +141,7 @@ in
     claude-code      # AI assistant
 
     # DB
-    postgresql     # PostgreSQL database server
+    postgresql_18  # psql/pg_dump on PATH; pinned to match dbeaver-wrapped's default client
   ];
 
   # Nix-managed JDK: installs JDK and sets JAVA_HOME (single source of truth)
@@ -169,4 +179,8 @@ in
     ANDROID_HOME = "$HOME/Android/Sdk";
     ANDROID_SDK_ROOT = "$HOME/Android/Sdk";
   };
+
+  # Expose dbeaver-wrapped's libexec/pg-clients/pgNN under /run/current-system/sw/libexec
+  # so DBeaver's Local Client browser has a stable path to point at.
+  environment.pathsToLink = [ "/libexec" ];
 }
